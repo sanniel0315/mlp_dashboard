@@ -131,7 +131,7 @@ st.header('模型訓練與結果')
 # 顯示當前模型參數設定
 st.write("當前模型參數設定：")
 current_params = {
-    "選擇的特徵": selected_features, # 顯示選擇的特徵
+    "選擇的特徵": selected_features,
     "hidden_layer_sizes": hidden_layer_sizes,
     "activation": activation_function,
     "solver": solver,
@@ -164,12 +164,11 @@ if st.button('🚀 訓練模型'):
                 learning_rate_init=learning_rate_init,
                 max_iter=max_iter,
                 early_stopping=early_stopping,
-                validation_fraction=validation_fraction,
+                validation_fraction=validation_fraction if early_stopping else 0.1, # 這裡設為 0.1 以符合預設值
                 n_iter_no_change=n_iter_no_change,
                 tol=tol,
-                random_state=42 # 保持訓練結果可重現性
+                random_state=42
             )
-
             # 訓練模型，顯示進度
             with st.spinner('模型訓練中，請稍候...'):
                 mlp.fit(X_train, y_train)
