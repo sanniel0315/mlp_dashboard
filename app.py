@@ -62,6 +62,14 @@ def load_and_preprocess_data():
         X_scaled_df, y, test_size=0.2, random_state=42, stratify=y
     )
     return X_train, X_test, y_train, y_test, iris.target_names, X.columns.tolist(), scaler
+if 'iris_original_data_loaded' not in st.session_state:
+    iris_full_dataset = load_iris() # 從 sklearn.datasets 導入 load_iris
+    st.session_state.original_X_df = pd.DataFrame(iris_full_dataset.data, columns=iris_full_dataset.feature_names)
+    st.session_state.original_y = iris_full_dataset.target
+    # target_names 也應該在此時或透過 load_and_preprocess_data 設為 st.session_state.target_names
+    if 'target_names' not in st.session_state:
+         st.session_state.target_names = iris_full_dataset.target_names.copy() # 使用 .copy() 避免意外修改
+    st.session_state.iris_original_data_loaded = True
 
 # --- 自定義訓練函數with真實進度 ---
 def train_mlp_with_progress(mlp, X_train, y_train, progress_bar, status_text):
@@ -900,142 +908,150 @@ with tab3:
         try:
             loaded_mlp_model = joblib.load(MODEL_PATH)
             loaded_data_scaler = joblib.load(SCALER_PATH)
-            
+            original_X_df = st.session_state.original_X_df
+            original_y = st.session_state.original_y
+            # 確保 target_names 是從 session_state 或全域變數正確獲取
             st.success("✅ 模型載入成功，可以進行預測！")
-            
-            # 預測界面
-            st.subheader("🔮 輸入特徵值進行預測")
-            
+            st.subheader("🔮 輸入特徵值進行預測 或 從原始樣本載入")
+            st.markdown("---")
+            # 特徵輸入區
+            st.write("**從原始鳶尾花資料集載入樣本進行預測：**")
+            sample_id_to_load = st.selectbox(
+                f"選擇一個原始樣本 ID (0 到 {len(original_X_df) - 1}):",
+                options=list(range(len(original_X_df))),
+                index=0, # 預設載入第一個樣本
+                key="sample_id_selector_tab3"
+            )
+
+            loaded_sample_features = original_X_df.iloc[sample_id_to_load] # DataFrame Series
+            true_label_for_loaded_sample_index = original_y[sample_id_to_load] # int
+            true_label_name_for_loaded_sample = target_names[true_label_for_loaded_sample_index] # str
+
+            st.info(f"目前載入的樣本 ID: {sample_id_to_load}。其已知的正確種類是: **{true_label_name_for_loaded_sample}**")
+            st.caption("下方的特徵值已從所選樣本自動填入，您可以直接預測，或修改後再預測。")
+            # --- 【新增結束】---
+
             # 創建輸入表單
-            with st.form("prediction_form"):
-                # 使用表格形式而非列布局來避免嵌套問題
-                st.write("**請輸入特徵值：**")
-                
+            with st.form("prediction_form_tab3_v2"): # 更新 form 的 key 以示區別
+                st.write("**請輸入或確認特徵值：**")
                 input_data = {}
-                for i, feature in enumerate(selected_features):
-                    feature_idx = all_feature_names.index(feature)
-                    original_data = X_train_full[feature] * loaded_data_scaler.scale_[feature_idx] + loaded_data_scaler.mean_[feature_idx]
-                    min_val = original_data.min()
-                    max_val = original_data.max()
-                    avg_val = original_data.mean()
-                    
+                for i, feature in enumerate(selected_features): # selected_features 來自側邊欄
+                    # 特徵輸入框的預設值使用載入樣本的特徵值
+                    default_value_for_input = loaded_sample_features.get(feature, 0.0) # 使用 .get 以防 feature 名稱意外不匹配
+
+                    # help 文字中的參考範圍，使用訓練集的統計數據 (原始尺度)
+                    # 假設 X_train_full (已縮放的訓練集特徵) 和 loaded_data_scaler (在 X_train_orig 上擬合) 可用
+                    feature_idx_for_stats = all_feature_names.index(feature) # all_feature_names 應包含所有原始特徵名
+                    # 以下計算假設 loaded_data_scaler 的 mean_ 和 scale_ 來自 X_train_orig
+                    # 並且 X_train_full[feature] 是已縮放的該特徵的訓練數據 Series
+                    original_scale_train_feature_stats = X_train_full[feature].values * loaded_data_scaler.scale_[feature_idx_for_stats] + loaded_data_scaler.mean_[feature_idx_for_stats]
+                    min_val_for_help = original_scale_train_feature_stats.min()
+                    max_val_for_help = original_scale_train_feature_stats.max()
+
                     input_data[feature] = st.number_input(
                         f'📏 {feature}',
-                        value=float(avg_val),
-                        min_value=float(min_val - 1),
-                        max_value=float(max_val + 1),
+                        value=float(default_value_for_input), # 預設填入載入樣本的特徵值
+                        min_value=float(min_val_for_help - 1 if min_val_for_help is not np.nan else 0.0), # 處理可能的nan
+                        max_value=float(max_val_for_help + 1 if max_val_for_help is not np.nan else 10.0), # 處理可能的nan
                         step=0.1,
-                        help=f"參考範圍: {min_val:.2f} ~ {max_val:.2f}"
+                        help=f"參考範圍 (來自訓練集分布): {min_val_for_help:.2f} ~ {max_val_for_help:.2f}"
                     )
-                
-                predict_button = st.form_submit_button("🔮 開始預測", type="primary", use_container_width=True)
-            
+
+                predict_button = st.form_submit_button("🔮 對上方特徵值進行預測", type="primary", use_container_width=True)
+
             if predict_button:
                 try:
-                    # 處理輸入數據
+                    # --- 準備預測的輸入資料 (與您現有邏輯類似) ---
                     full_input_df = pd.DataFrame(columns=all_feature_names)
-                    
-                    for feature in all_feature_names:
-                        if feature in selected_features:
-                            full_input_df.loc[0, feature] = input_data[feature]
+                    for feature_iter_name in all_feature_names:
+                        if feature_iter_name in selected_features: # 只使用側邊欄選擇的特徵進行預測
+                            full_input_df.loc[0, feature_iter_name] = input_data[feature_iter_name]
                         else:
-                            feature_idx = all_feature_names.index(feature)
-                            original_mean = loaded_data_scaler.mean_[feature_idx]
-                            full_input_df.loc[0, feature] = original_mean
+                            # 對於模型訓練時包含但本次預測未在 selected_features 中的特徵，
+                            # 仍需用原始訓練集的平均值填充以符合 scaler 的期望
+                            feature_idx = all_feature_names.index(feature_iter_name)
+                            original_mean = loaded_data_scaler.mean_[feature_idx] # 來自 X_train_orig 的平均值
+                            full_input_df.loc[0, feature_iter_name] = original_mean
                     
-                    # 標準化和預測
-                    input_scaled = loaded_data_scaler.transform(full_input_df)
-                    selected_indices = [all_feature_names.index(f) for f in selected_features]
-                    input_for_prediction = input_scaled[:, selected_indices]
-                    
+                    input_scaled = loaded_data_scaler.transform(full_input_df) # 縮放所有特徵
+                    # 根據側邊欄選擇的特徵來選取實際用於模型預測的列
+                    selected_indices_for_model = [all_feature_names.index(f) for f in selected_features]
+                    input_for_prediction = input_scaled[:, selected_indices_for_model]
+                    # --- 預測資料準備結束 ---
+
                     prediction_proba = loaded_mlp_model.predict_proba(input_for_prediction)
-                    prediction_class = np.argmax(prediction_proba)
-                    
-                    # 顯示預測結果
+                    prediction_class_index = np.argmax(prediction_proba)
+                    predicted_label_name = target_names[prediction_class_index]
+
+                    # --- 顯示標準預測結果 (與您現有邏輯類似) ---
                     st.subheader("🎉 預測結果")
-                    
-                    # 主要預測結果
                     st.metric(
-                        "🌸 預測類別",
-                        target_names[prediction_class],
-                        delta=f"信心度: {prediction_proba[0][prediction_class]:.1%}"
+                        "🌸 模型預測類別",
+                        predicted_label_name,
+                        delta=f"信心度: {prediction_proba[0][prediction_class_index]:.1%}"
                     )
-                    
-                    # 機率橫條圖
-                    proba_df = pd.DataFrame({
-                        '種類': target_names,
+                    # ... (您原本顯示預測機率長條圖和詳細機率分布的程式碼照舊) ...
+                    # (機率長條圖)
+                    proba_df_display = pd.DataFrame({ # 避免變數名衝突
+                        '種類': target_names, # 使用正確的 target_names
                         '機率': prediction_proba[0]
                     }).sort_values('機率', ascending=True)
-                    
-                    fig_pred, ax_pred = plt.subplots(figsize=(8, 4))
-                    bars = ax_pred.barh(proba_df['種類'], proba_df['機率'], 
-                                      color=['#ff7f7f' if name == target_names[prediction_class] else '#87ceeb' 
-                                            for name in proba_df['種類']])
-                    ax_pred.set_xlabel('預測機率')
-                    ax_pred.set_title('各類別預測機率分布')
-                    ax_pred.set_xlim(0, 1)
-                    
-                    # 在橫條上顯示數值
-                    for i, bar in enumerate(bars):
-                        width = bar.get_width()
-                        ax_pred.text(width + 0.01, bar.get_y() + bar.get_height()/2, 
-                                   f'{width:.1%}', ha='left', va='center', fontweight='bold')
-                    
+                    fig_pred_display, ax_pred_display = plt.subplots(figsize=(8, 4)) # 避免變數名衝突
+                    bars_display = ax_pred_display.barh(proba_df_display['種類'], proba_df_display['機率'],
+                                          color=['#ff7f7f' if name == predicted_label_name else '#87ceeb'
+                                                 for name in proba_df_display['種類']])
+                    ax_pred_display.set_xlabel('預測機率')
+                    ax_pred_display.set_title('各類別預測機率分布')
+                    ax_pred_display.set_xlim(0, 1)
+                    for bar_item_display in bars_display: # 避免變數名衝突
+                        width_display = bar_item_display.get_width()
+                        ax_pred_display.text(width_display + 0.01, bar_item_display.get_y() + bar_item_display.get_height()/2,
+                                   f'{width_display:.1%}', ha='left', va='center', fontweight='bold')
                     plt.tight_layout()
-                    st.pyplot(fig_pred)
-                    buffer = create_downloadable_plot(fig_pred, "prediction_probability.png")
-                    st.download_button(
-                        label="📥 下載預測機率圖",
-                        data=buffer,
-                        file_name="prediction_probability.png",
-                        mime="image/png"
-                    )
-                    
-                    plt.close(fig_pred)
-                                        
-                    # 詳細機率表
-                    st.subheader("📊 詳細機率分布")
-                    detailed_proba = pd.DataFrame({
-                        '花的種類': target_names,
+                    st.pyplot(fig_pred_display)
+                    plt.close(fig_pred_display)
+
+                    # (詳細機率表)
+                    st.subheader("🔬 詳細機率分布")
+                    detailed_proba_df_display = pd.DataFrame({
+                        '花的種類': target_names, # 使用正確的 target_names
                         '預測機率': [f"{p:.1%}" for p in prediction_proba[0]],
-                        '信心等級': ['🔥 高信心' if p > 0.7 else '⚡ 中信心' if p > 0.4 else '💤 低信心' 
-                                    for p in prediction_proba[0]]
+                        '信心等級': ['🔥 高信心' if p > 0.7 else '⚡ 中信心' if p > 0.4 else '💤 低信心'
+                                   for p in prediction_proba[0]]
                     })
-                    st.dataframe(detailed_proba, use_container_width=True)
-                    if st.button("📦 打包下載所有圖表", type="secondary", use_container_width=False):
-                        # 打包所有圖表
-                        with zipfile.ZipFile("predictions.zip", "w") as zipf:
-                            zipf.write("prediction_probability.png")
-                            zipf.write("cross_validation_results.png")
-                            zipf.write("learning_curve.png")
-                            zipf.write("performance_radar_chart.png")
-                            zipf.write("confusion_matrix.png")
-                        
-                        with open("predictions.zip", "rb") as f:
-                            st.download_button(
-                                label="📥 下載所有圖表",
-                                data=f,
-                                file_name="predictions.zip",
-                                mime="application/zip"
-                            )
-                    
+                    st.dataframe(detailed_proba_df_display, use_container_width=True)
+                    # --- 標準預測結果顯示結束 ---
+
+                    # --- 【修改】比對模型預測與 "自動載入的" 原始樣本正確答案 ---
+                    st.subheader("🔍 預測與原始樣本答案比對")
+                    if predicted_label_name == true_label_name_for_loaded_sample: # true_label_name_for_loaded_sample 來自選擇的樣本
+                        st.success(f"✅ **一致！** 模型預測 ({predicted_label_name}) 與所選原始樣本 (ID: {sample_id_to_load}) 的正確答案 ({true_label_name_for_loaded_sample}) 相同。")
+                    else:
+                        st.error(f"❌ **不一致！** 模型預測為 ({predicted_label_name})，但所選原始樣本 (ID: {sample_id_to_load}) 的正確答案是 ({true_label_name_for_loaded_sample})。")
+                    # --- 【修改結束】---
+
                 except Exception as e:
                     st.error(f"❌ 預測過程發生錯誤：{e}")
-                except Exception as e:
-                    st.error(f"❌ 預測過程發生錯誤：{e}")
-        
+                    import traceback
+                    st.text("詳細錯誤堆疊：")
+                    st.code(traceback.format_exc())
+        # ... (處理模型載入失敗和模型未訓練的 except 和 else 區塊照舊) ...
         except Exception as e:
             st.error(f"❌ 模型載入失敗：{e}")
-    
-    else:
+            import traceback
+            st.text("詳細錯誤堆疊：")
+            st.code(traceback.format_exc())
+    else: # model_exists is False
         st.warning("⚠️ 請先在「🎯 模型訓練」標籤頁訓練模型")
         st.info("💡 訓練完成後即可在此進行即時預測")
+            
+            
 
 # --- 頁腳 ---
 st.markdown("---")
 st.subheader("📚 相關資源")
 
 st.markdown("**📊 資料來源：** [Scikit-learn Iris Dataset](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.load_iris.html)")
-st.markdown("**☁️ 部署平台：** [Streamlit Cloud](https://streamlit.io/cloud)")
+st.markdown("**⚡ 部署平台：** [Streamlit Cloud](https://streamlit.io/cloud)")
 st.markdown("**🛠️ 技術框架：** Streamlit + Scikit-learn + Matplotlib")
-st.markdown("**🧠 模型說明：** 本應用使用多層感知器 (MLP) 進行鳶尾花分類，支援完整的超參數調整與結果分析")
+st.markdown("**⚛️ 模型說明：** 本應用使用多層感知器 (MLP) 進行鳶尾花分類，支援完整的超參數調整與結果分析")
