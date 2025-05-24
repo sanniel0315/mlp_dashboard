@@ -8,6 +8,8 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # --- 數據加載與預處理 (使用 Streamlit 緩存) ---
 @st.cache_data
@@ -201,7 +203,15 @@ if st.button('🚀 訓練模型'):
             ax_cm.set_title('混淆矩陣')
             st.pyplot(fig_cm)
             plt.close(fig_cm) # 關閉圖形以釋放內存
-
+            fig, ax = plt.subplots()
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                        xticklabels=target_names, yticklabels=target_names, ax=ax)
+            ax.set_xlabel('預測標籤', fontproperties='SimHei')  # 設定軸標籤字型
+            ax.set_ylabel('真實標籤', fontproperties='SimHei')
+            ax.set_title('混淆矩陣', fontproperties='SimHei')  # 設定標題字型
+            plt.setp(ax.get_xticklabels(), fontproperties='SimHei') # 設定刻度標籤字型
+            plt.setp(ax.get_yticklabels(), fontproperties='SimHei')
+            st.pyplot(fig)
             st.subheader('損失曲線')
             if hasattr(mlp, 'loss_curve_') and mlp.loss_curve_ is not None and len(mlp.loss_curve_) > 0:
                 fig_loss, ax_loss = plt.subplots()
