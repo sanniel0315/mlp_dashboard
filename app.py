@@ -169,18 +169,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 st.markdown(f"""
-<div style="background-color: #4dabf7; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; color: white; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.1);">
-    <div style="font-size: 28px; font-weight: 800;"> MLP 模型訓練與預測系統</div>
+<div style="background-color: #4dabf7; padding: 20px 28px; display: flex; justify-content: space-between; align-items: center; color: white; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.1);">
+    <div style="font-size: 34px; font-weight: 800;"> MLP 模型訓練與預測系統</div>
     <div style="text-align: right;">
-        <div style="font-size: 15px; opacity: 0.9;">{date_str}</div>
-        <div style="font-size: 20px; font-weight: bold;">{time_str}</div>
+        <div style="font-size: 20px; opacity: 0.9;">{date_str}</div>
+        <div style="font-size: 25px; font-weight: bold;">{time_str}</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 st.markdown("""
-<h3 style="margin-bottom: 14px; font-weight: normal; color: #555;">
+<h4 style="margin-bottom: px; font-weight: normal; color: #555;">
 透過調整參數訓練 MLP 模型，並即時進行預測
-</h3>
+</h4>
 """, unsafe_allow_html=True)
 
 
@@ -616,6 +616,9 @@ st.sidebar.write("• 調低學習率提高穩定性")
 st.sidebar.markdown("---")
 st.sidebar.subheader("📋 當前狀態")
 
+if st.sidebar.checkbox("顯示狀態調試信息", False):
+    st.sidebar.write(f"模型文件存在: {os.path.exists(MODEL_PATH)}")
+
 if st.session_state.model_trained and st.session_state.training_results:
     results = st.session_state.training_results
     st.sidebar.success("✅ 模型已訓練")
@@ -623,7 +626,6 @@ if st.session_state.model_trained and st.session_state.training_results:
     st.sidebar.metric("F1-Score", f"{results['f1'].mean():.3f}")
 else:
     st.sidebar.info("⏳ 等待訓練")
-
 # 數據集信息
 st.sidebar.markdown("---")
 st.sidebar.subheader("📊 數據集資訊")
@@ -771,8 +773,9 @@ with tabs[0]:
                             **evaluation_results
                         }
                         st.session_state.model_trained = True
-                        # 顯示確認信息
-                        print(f"DEBUG: 訓練完成 - model_trained設置為{st.session_state.model_trained}")
+                        # 添加這個標記，表示我們需要在下一次執行時強制更新UI
+                        st.session_state.need_ui_update = True
+                        
                         progress_bar.progress(100)
                         status_text.text("✅ 訓練完成！")
                         
@@ -805,8 +808,7 @@ with tabs[0]:
                 except:
                     st.warning("⚠️ 模型文件刪除失敗，但記憶已清除")
                 
-                # st.rerun()  # 重新運行應用程式
-                st.experimental_rerun()  
+                
         st.markdown('</div>', unsafe_allow_html=True)
     
     # 在所有 columns 外面顯示快速結果預覽
@@ -835,7 +837,10 @@ with tabs[0]:
 
 # --- Tab 2: 訓練結果 ---
 with tabs[1]:
-    if st.session_state.model_trained and st.session_state.training_results:
+    # 檢查模型文件是否存在
+    model_file_exists = os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH)
+    if 'model_trained' in st.session_state and st.session_state.model_trained and 'training_results' in st.session_state and st.session_state.training_results:
+        # 正常顯示結果
         results = st.session_state.training_results
         
         # === 模型性能總覽 ===
@@ -1320,8 +1325,30 @@ with tabs[1]:
             )
         st.markdown('</div>', unsafe_allow_html=True)
     
-    elif model_exists:
-        st.info("📁 發現已保存的模型，但本次未進行訓練。如需查看詳細結果，請重新訓練模型。")
+    elif model_file_exists:
+        # 如果模型文件存在但session state不一致，嘗試載入
+        st.info("發現模型文件，正在載入...")
+        try:
+            loaded_mlp_model = joblib.load(MODEL_PATH)
+            loaded_data_scaler = joblib.load(SCALER_PATH)
+            
+            # 執行評估
+            evaluation_results = comprehensive_evaluation(
+                loaded_mlp_model, X_train, X_test, y_train, y_test, target_names
+            )
+            
+            # 更新session state
+            st.session_state.training_results = {
+                'mlp': loaded_mlp_model,
+                'selected_features': selected_features,
+                **evaluation_results
+            }
+            st.session_state.model_trained = True
+             #提示用戶刷新頁面
+            st.success("✅ 模型已成功載入! 請手動刷新頁面以查看結果")
+            st.button("刷新頁面", on_click=lambda: None)  # 這個按鈕只是提示用戶刷新頁面
+        except Exception as e:
+            st.error(f"載入模型失敗: {e}")
     else:
         st.warning("⚠️ 請先在「🎯 模型訓練」標籤頁訓練模型")
 
