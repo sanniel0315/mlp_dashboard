@@ -543,8 +543,30 @@ alpha = st.sidebar.number_input('🛡️ L2 正則化強度', min_value=0.0001, 
 model_exists = os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH)
 if model_exists:
     st.sidebar.success("✅ 發現已保存的模型")
+    if not st.session_state.model_trained or st.session_state.training_results is None:
+        try:
+            # 嘗試載入模型
+            loaded_mlp_model = joblib.load(MODEL_PATH)
+            loaded_data_scaler = joblib.load(SCALER_PATH)
+            
+            # 在載入頁面時執行簡單評估獲取基本指標
+            evaluation_results = comprehensive_evaluation(
+                loaded_mlp_model, X_train, X_test, y_train, y_test, target_names
+            )
+            
+            # 更新session state
+            st.session_state.training_results = {
+                'mlp': loaded_mlp_model,
+                'selected_features': selected_features,
+                **evaluation_results
+            }
+            st.session_state.model_trained = True
+            
+        except Exception as e:
+            st.sidebar.warning(f"⚠️ 發現模型文件但無法載入: {e}")
 else:
     st.sidebar.info("ℹ️ 尚未訓練模型")
+
 
 # 參數建議
 st.sidebar.markdown("---")
