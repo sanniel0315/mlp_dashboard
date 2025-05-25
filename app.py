@@ -790,23 +790,29 @@ with tabs[0]:
                         st.code(traceback.format_exc())
         
         with reset_col:
-            if st.button('🔄 重置模型', use_container_width=True):
-                st.session_state.model_trained = False  # 直接設為False而不是刪除
-                st.session_state.training_results = None  # 直接設為None而不是刪除
-                # # 清除 session state
-                # if 'model_trained' in st.session_state:
-                #     del st.session_state.model_trained
-                # if 'training_results' in st.session_state:
-                #     del st.session_state.training_results
-                # 刪除保存的模型文件
+            reset_button = st.button('🔄 重置模型', use_container_width=True)
+            
+            if reset_button:
+                # 直接設置狀態而不是刪除
+                st.session_state.model_trained = False
+                st.session_state.training_results = None
+                
+                # 刪除模型文件
+                deletion_success = True
                 try:
                     if os.path.exists(MODEL_PATH):
                         os.remove(MODEL_PATH)
                     if os.path.exists(SCALER_PATH):
                         os.remove(SCALER_PATH)
-                    st.success("✅ 模型已重置！")
                 except:
-                    st.warning("⚠️ 模型文件刪除失敗，但記憶已清除")
+                    deletion_success = False
+                
+                # 使用一個占位區域顯示結果消息
+                message_placeholder = st.empty()
+                if deletion_success:
+                    message_placeholder.success("✅ 模型已重置！")
+                else:
+                    message_placeholder.warning("⚠️ 模型文件刪除失敗，但狀態已清除")
                 
                 
         st.markdown('</div>', unsafe_allow_html=True)
