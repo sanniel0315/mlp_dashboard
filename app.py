@@ -594,6 +594,53 @@ else:
     st.sidebar.info("ℹ️ 尚未訓練模型")
 
 
+
+
+# 增加間隔，使收斂優化部分與前面的建議有所區分
+st.sidebar.markdown("&nbsp;")  # 空白間隔
+
+# 當前狀態顯示
+st.sidebar.markdown("---")
+st.sidebar.subheader("📋 當前狀態")
+
+if st.sidebar.checkbox("顯示狀態調試信息", False):
+    st.sidebar.write(f"模型文件存在: {os.path.exists(MODEL_PATH)}")
+
+if st.session_state.model_trained and st.session_state.training_results:
+    results = st.session_state.training_results
+    st.sidebar.success("✅ 模型已訓練")
+    st.sidebar.metric("測試準確率", f"{results['test_accuracy']:.3f}")
+    st.sidebar.metric("F1-Score", f"{results['f1'].mean():.3f}")
+else:
+    st.sidebar.info("⏳ 等待訓練")
+
+# 數據集信息
+st.sidebar.markdown("---")
+st.sidebar.subheader("📊 數據集資訊")
+st.sidebar.write(f"• 總樣本數: {len(X_train_full) + len(X_test_full)}")
+st.sidebar.write(f"• 訓練集: {len(X_train_full)} 樣本")
+st.sidebar.write(f"• 測試集: {len(X_test_full)} 樣本")
+st.sidebar.write(f"• 特徵總數: {len(all_feature_names)}")
+st.sidebar.write(f"• 選擇特徵: {len(selected_features)}")
+st.sidebar.write(f"• 類別數: {len(target_names)}")
+st.sidebar.markdown("&nbsp;")  # 空白間隔
+
+# 切分比例建議
+st.sidebar.markdown("**💡 切分比例建議：**")
+total_samples = len(X_train_full) + len(X_test_full)
+
+if total_samples < 100:
+    st.sidebar.info(f"小型資料集 ({total_samples} 樣本)，建議測試集比例: 0.2~0.3")
+elif total_samples < 1000:
+    st.sidebar.info(f"中型資料集 ({total_samples} 樣本)，建議測試集比例: 0.15~0.25")
+else:
+    st.sidebar.info(f"大型資料集 ({total_samples} 樣本)，建議測試集比例: 0.1~0.2")
+
+# 警告過小的測試集
+min_test_samples = int(total_samples * test_size)
+if min_test_samples < 30:
+    st.sidebar.warning(f"⚠️ 測試集僅有 {min_test_samples} 個樣本，可能不足以可靠評估模型")
+st.sidebar.markdown("&nbsp;")  # 空白間隔
 # 參數建議
 st.sidebar.markdown("---")
 st.sidebar.subheader("💡 參數調優建議")
@@ -611,53 +658,11 @@ if solver in ['adam', 'sgd'] and learning_rate_init > 0.01:
 
 if hidden_layer_1 > 150 and len(selected_features) <= 4:
     st.sidebar.warning("隱藏層神經元數可能過多，易過擬合")
-
 # 收斂優化建議
 st.sidebar.markdown("**🔄 收斂優化：**")
 st.sidebar.write("• 遇到收斂警告時增加迭代次數")
 st.sidebar.write("• 啟用 Early Stopping 防止過度訓練")
 st.sidebar.write("• 調低學習率提高穩定性")
-
-# 當前狀態顯示
-st.sidebar.markdown("---")
-st.sidebar.subheader("📋 當前狀態")
-
-if st.sidebar.checkbox("顯示狀態調試信息", False):
-    st.sidebar.write(f"模型文件存在: {os.path.exists(MODEL_PATH)}")
-
-if st.session_state.model_trained and st.session_state.training_results:
-    results = st.session_state.training_results
-    st.sidebar.success("✅ 模型已訓練")
-    st.sidebar.metric("測試準確率", f"{results['test_accuracy']:.3f}")
-    st.sidebar.metric("F1-Score", f"{results['f1'].mean():.3f}")
-else:
-    st.sidebar.info("⏳ 等待訓練")
-# 數據集信息
-st.sidebar.markdown("---")
-st.sidebar.subheader("📊 數據集資訊")
-st.sidebar.write(f"• 總樣本數: {len(X_train_full) + len(X_test_full)}")
-st.sidebar.write(f"• 訓練集: {len(X_train_full)} 樣本")
-st.sidebar.write(f"• 測試集: {len(X_test_full)} 樣本")
-st.sidebar.write(f"• 特徵總數: {len(all_feature_names)}")
-st.sidebar.write(f"• 選擇特徵: {len(selected_features)}")
-st.sidebar.write(f"• 類別數: {len(target_names)}")
-
-# 切分比例建議
-st.sidebar.markdown("**💡 切分比例建議：**")
-total_samples = len(X_train_full) + len(X_test_full)
-
-if total_samples < 100:
-    st.sidebar.info(f"小型資料集 ({total_samples} 樣本)，建議測試集比例: 0.2~0.3")
-elif total_samples < 1000:
-    st.sidebar.info(f"中型資料集 ({total_samples} 樣本)，建議測試集比例: 0.15~0.25")
-else:
-    st.sidebar.info(f"大型資料集 ({total_samples} 樣本)，建議測試集比例: 0.1~0.2")
-
-# 警告過小的測試集
-min_test_samples = int(total_samples * test_size)
-if min_test_samples < 30:
-    st.sidebar.warning(f"⚠️ 測試集僅有 {min_test_samples} 個樣本，可能不足以可靠評估模型")
-
 # --- 主要內容區域使用 Tabs ---
 # 使用更美觀的標籤頁
 tabs = st.tabs([
