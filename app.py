@@ -43,15 +43,41 @@ st.markdown("""
     /* 標籤頁樣式 */
     button[data-baseweb="tab"] {
         font-size: 24px !important;  /* 原來是18px，增大至24px */
-        font-weight: 700 !important; /* 加粗一點 */
-        padding: 16px 32px !important; /* 原來是12px 24px，增大內邊距 */
-        border-radius: 8px 8px 0 0 !important; /* 略微增大圓角 */
-        margin-right: 8px !important; /* 增加標籤間距 */
-        border: 1px solid #e0e0e0 !important;
+        font-weight: 800 !important; /* 加粗一點 */
+        padding: 20px 40px !important; /* 原來是12px 24px，增大內邊距 */
+        order-radius: 10px 10px 0 0 !important; /* 更大的圓角 */
+        margin-right: 10px !important; /* 更大的標籤間距 */
+        border: 2px solid #e0e0e0 !important; /* 更粗的邊框 */
         border-bottom: none !important;
-        min-width: 180px !important; /* 確保標籤足夠寬 */
+        min-width: 220px !important; /* 確保標籤更寬 */
+        height: auto !important; /* 自動高度 */
+        min-height: 70px !important; /* 確保最小高度 */
+        line-height: 1.4 !important; /* 調整行高 */
+        transform: scale(1.05); /* 稍微放大整個按鈕 */
+        box-shadow: 0 -2px 5px rgba(0,0,0,0.05); /* 添加輕微陰影增強立體感 */
+    }
+    button[data-baseweb="tab"]:hover {
+        background-color: #f0f8ff !important; /* 更明顯的懸停效果 */
+        transform: scale(1.1) translateY(-2px) !important; /* 懸停時更明顯的放大效果 */
+        transition: all 0.3s ease !important;
     }
     
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #e6f3ff !important; /* 選中標籤的背景色 */
+        border-bottom: 3px solid #4dabf7 !important; /* 選中標籤的底部邊框 */
+        color: #1a73e8 !important; /* 選中標籤的文字顏色 */
+    }
+    
+    div[role="tablist"] {
+        border-bottom: 4px solid #4dabf7 !important; /* 更粗的底部邊框 */
+        margin-bottom: 35px !important; /* 更大的下方間距 */
+        padding-bottom: 0 !important; /* 移除底部內邊距以避免間隙 */
+    }
+    
+    /* 為標籤頁內容添加頂部間距，避免與標籤太近 */
+    div[data-baseweb="tab-panel"] {
+        padding-top: 20px !important;
+    }
     div[role="tablist"] {
         border-bottom: 3px solid #4dabf7 !important; /* 加粗底部邊框 */
         margin-bottom: 30px !important; /* 增加下方間距 */
