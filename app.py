@@ -42,20 +42,19 @@ st.markdown("""
     
     /* 標籤頁樣式 */
     button[data-baseweb="tab"] {
-        font-size: 22px !important;
-        font-weight: 600 !important;
-        padding: 12px 24px !important;
-        border-radius: 5px 5px 0 0 !important;
-        margin-right: 5px !important;
+        font-size: 24px !important;  /* 原來是18px，增大至24px */
+        font-weight: 700 !important; /* 加粗一點 */
+        padding: 16px 32px !important; /* 原來是12px 24px，增大內邊距 */
+        border-radius: 8px 8px 0 0 !important; /* 略微增大圓角 */
+        margin-right: 8px !important; /* 增加標籤間距 */
         border: 1px solid #e0e0e0 !important;
         border-bottom: none !important;
+        min-width: 180px !important; /* 確保標籤足夠寬 */
     }
-    button[data-baseweb="tab"]:hover {
-        background-color: #f5f5f5 !important;
-    }
+    
     div[role="tablist"] {
-        border-bottom: 2px solid #4dabf7 !important;
-        margin-bottom: 25px !important;
+        border-bottom: 3px solid #4dabf7 !important; /* 加粗底部邊框 */
+        margin-bottom: 30px !important; /* 增加下方間距 */
     }
     
     /* 卡片容器樣式 */
@@ -131,22 +130,28 @@ st.markdown("""
     }
     
     /* 按鈕美化 */
-    button[kind="primary"] {
-        background-color: #4dabf7 !important;
-        border-radius: 8px !important;
+    button[kind="primary"], button[kind="secondary"] {
+        font-size: 18px !important; /* 加大字體 */
+        padding: 14px 22px !important; /* 增大內邊距 */
+        height: auto !important; /* 自動高度適應內容 */
+        min-height: 60px !important; /* 確保最小高度 */
+        border-radius: 10px !important; /* 增大圓角 */
         transition: all 0.3s !important;
     }
+    }
     button[kind="primary"]:hover {
+        transform: translateY(-2px) !important; /* 懸停時微微上浮 */
         background-color: #339af0 !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1) !important;
     }
     button[kind="secondary"] {
         border-radius: 8px !important;
         transition: all 0.3s !important;
     }
     button[kind="secondary"]:hover {
+        transform: translateY(-2px) !important;
         background-color: #e9ecef !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1) !important;
     }
     
     /* 狀態指示器 */
@@ -168,6 +173,7 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
 st.markdown(f"""
 <div style="background-color: #4dabf7; padding: 20px 28px; display: flex; justify-content: space-between; align-items: center; color: white; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.1);">
     <div style="font-size: 34px; font-weight: 800;"> MLP 模型訓練與預測系統</div>
@@ -655,9 +661,9 @@ if min_test_samples < 30:
 # --- 主要內容區域使用 Tabs ---
 # 使用更美觀的標籤頁
 tabs = st.tabs([
-    "🎯 **模型訓練**", 
-    "📊 **訓練結果**", 
-    "🔮 **即時預測**"
+    "🎯 **模型訓練** ", 
+    "📊 **訓練結果** ", 
+    "🔮 **即時預測** "
 ])
 
 # --- Tab 1: 模型訓練 ---
