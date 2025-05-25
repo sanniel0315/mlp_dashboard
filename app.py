@@ -751,7 +751,8 @@ with tabs[0]:
                             **evaluation_results
                         }
                         st.session_state.model_trained = True
-                        
+                        # 顯示確認信息
+                        print(f"DEBUG: 訓練完成 - model_trained設置為{st.session_state.model_trained}")
                         progress_bar.progress(100)
                         status_text.text("✅ 訓練完成！")
                         
@@ -767,12 +768,13 @@ with tabs[0]:
         
         with reset_col:
             if st.button('🔄 重置模型', use_container_width=True):
-                # 清除 session state
-                if 'model_trained' in st.session_state:
-                    del st.session_state.model_trained
-                if 'training_results' in st.session_state:
-                    del st.session_state.training_results
-                
+                st.session_state.model_trained = False  # 直接設為False而不是刪除
+                st.session_state.training_results = None  # 直接設為None而不是刪除
+                # # 清除 session state
+                # if 'model_trained' in st.session_state:
+                #     del st.session_state.model_trained
+                # if 'training_results' in st.session_state:
+                #     del st.session_state.training_results
                 # 刪除保存的模型文件
                 try:
                     if os.path.exists(MODEL_PATH):
@@ -783,7 +785,8 @@ with tabs[0]:
                 except:
                     st.warning("⚠️ 模型文件刪除失敗，但記憶已清除")
                 
-                st.rerun()  # 重新運行應用程式
+                # st.rerun()  # 重新運行應用程式
+                st.experimental_rerun()  
         st.markdown('</div>', unsafe_allow_html=True)
     
     # 在所有 columns 外面顯示快速結果預覽
