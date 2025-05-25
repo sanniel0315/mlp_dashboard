@@ -14,6 +14,8 @@ from matplotlib.font_manager import FontProperties, findfont, findSystemFonts, f
 import joblib
 from io import BytesIO
 import zipfile
+import pytz
+from datetime import datetime
 
 # --- 頁面配置 ---
 st.set_page_config(
@@ -22,6 +24,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# 先定義台灣時區，再使用它
+taiwan_tz = pytz.timezone('Asia/Taipei')
+current_time = datetime.now(taiwan_tz)
+date_str = current_time.strftime("%Y年%m月%d日")
+time_str = current_time.strftime("%H:%M:%S")
 
 # --- 自定義 CSS 樣式 ---
 st.markdown("""
@@ -34,7 +42,7 @@ st.markdown("""
     
     /* 標籤頁樣式 */
     button[data-baseweb="tab"] {
-        font-size: 18px !important;
+        font-size: 22px !important;
         font-weight: 600 !important;
         padding: 12px 24px !important;
         border-radius: 5px 5px 0 0 !important;
@@ -160,6 +168,21 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+st.markdown(f"""
+<div style="background-color: #4dabf7; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; color: white; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.1);">
+    <div style="font-size: 28px; font-weight: 800;"> MLP 模型訓練與預測系統</div>
+    <div style="text-align: right;">
+        <div style="font-size: 15px; opacity: 0.9;">{date_str}</div>
+        <div style="font-size: 20px; font-weight: bold;">{time_str}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+st.markdown("""
+<h3 style="margin-bottom: 14px; font-weight: normal; color: #555;">
+透過調整參數訓練 MLP 模型，並即時進行預測
+</h3>
+""", unsafe_allow_html=True)
+
 
 def create_downloadable_plot(fig, filename="plot.png"):
     """將 matplotlib 圖形轉換為可下載的格式"""
@@ -403,9 +426,6 @@ def comprehensive_evaluation(mlp, X_train, X_test, y_train, y_test, target_names
         'convergence_info': convergence_info
     }
 
-# --- 主標題 ---
-st.title('MLP 模型訓練與預測系統')
-st.markdown('### 透過調整參數訓練 MLP 模型，並即時進行預測')
 
 # --- 側邊欄參數設定 ---
 st.sidebar.header('🔧 MLP 模型超參數設定')
