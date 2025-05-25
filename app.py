@@ -14,19 +14,232 @@ from matplotlib.font_manager import FontProperties, findfont, findSystemFonts, f
 import joblib
 from io import BytesIO
 import zipfile
+
 # --- 頁面配置 ---
 st.set_page_config(
     page_title="MLP 模型訓練器",
-    page_icon="🧬",  # DNA螺旋 - 複雜學習結構的完美象徵
+    page_icon="🧬",  
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- 自定義 CSS 樣式 ---
+st.markdown("""
+<style>
+    /* 全局樣式 */
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    
+    /* 標籤頁樣式 */
+    button[data-baseweb="tab"] {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        padding: 12px 24px !important;
+        border-radius: 5px 5px 0 0 !important;
+        margin-right: 5px !important;
+        border: 1px solid #e0e0e0 !important;
+        border-bottom: none !important;
+    }
+    button[data-baseweb="tab"]:hover {
+        background-color: #f5f5f5 !important;
+    }
+    div[role="tablist"] {
+        border-bottom: 2px solid #4dabf7 !important;
+        margin-bottom: 25px !important;
+    }
+    
+    /* 卡片容器樣式 */
+    .card-container {
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
+        border-left: 4px solid #4dabf7;
+    }
+    
+    /* 參數組樣式 */
+    .param-group {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    
+    /* 參數區塊樣式 */
+    .parameter-section {
+        margin-bottom: 20px;
+    }
+    
+    /* 特徵列表區塊樣式 */
+    .feature-list-section {
+        background-color: #f0f9ff;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border-left: 3px solid #339af0;
+    }
+    
+    /* 美化標題 */
+    .stSubheader {
+        font-size: 1.5rem !important;
+        font-weight: 600 !important;
+        color: #2c3e50 !important;
+        margin-bottom: 1rem !important;
+        padding-bottom: 0.5rem !important;
+        border-bottom: 2px solid #f1f3f5 !important;
+    }
+    
+    /* 指標卡片樣式 */
+    div.stMetric {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        transition: transform 0.3s;
+        border-left: 5px solid #4dabf7;
+    }
+    div.stMetric:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* 表格美化 */
+    div.stTable, div[data-testid="stDataFrame"] {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    /* 輸入元素美化 */
+    div.stSlider, div.stSelectbox, div.stNumberInput, div.stCheckbox {
+        padding: 10px;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        margin-bottom: 15px;
+        border: 1px solid #e9ecef;
+    }
+    
+    /* 按鈕美化 */
+    button[kind="primary"] {
+        background-color: #4dabf7 !important;
+        border-radius: 8px !important;
+        transition: all 0.3s !important;
+    }
+    button[kind="primary"]:hover {
+        background-color: #339af0 !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+    }
+    button[kind="secondary"] {
+        border-radius: 8px !important;
+        transition: all 0.3s !important;
+    }
+    button[kind="secondary"]:hover {
+        background-color: #e9ecef !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* 狀態指示器 */
+    div[data-testid="stAlert"][kind="success"] {
+        border-radius: 8px;
+        border-left: 5px solid #51cf66;
+    }
+    div[data-testid="stAlert"][kind="warning"] {
+        border-radius: 8px;
+        border-left: 5px solid #fcc419;
+    }
+    div[data-testid="stAlert"][kind="error"] {
+        border-radius: 8px;
+        border-left: 5px solid #ff6b6b;
+    }
+    div[data-testid="stAlert"][kind="info"] {
+        border-radius: 8px;
+        border-left: 5px solid #4dabf7;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 def create_downloadable_plot(fig, filename="plot.png"):
     """將 matplotlib 圖形轉換為可下載的格式"""
     buffer = BytesIO()
     fig.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
     buffer.seek(0)
     return buffer
+
+def plot_decision_boundary(mlp_model, X_train, y_train, feature_indices, feature_names, tatarget_names, scaler, resolution=100):
+    """繪製2D決策邊界"""
+    import matplotlib.patches as mpatches
+    
+    # 獲取兩個特徵的範圍
+    X_subset = X_train.iloc[:, feature_indices]
+    x_min, x_max = X_subset.iloc[:, 0].min() - 0.5, X_subset.iloc[:, 0].max() + 0.5
+    y_min, y_max = X_subset.iloc[:, 1].min() - 0.5, X_subset.iloc[:, 1].max() + 0.5
+    
+    # 創建網格
+    xx, yy = np.meshgrid(np.linspace(x_min, x_max, resolution),
+                         np.linspace(y_min, y_max, resolution))
+    
+    # 準備預測數據
+    grid_points = np.c_[xx.ravel(), yy.ravel()]
+    
+    # 如果模型需要更多特徵，用平均值填充
+    if len(feature_indices) < X_train.shape[1]:
+        # 創建一個包含所有特徵的 DataFrame
+        full_grid_data = {}
+        
+        # 首先，為所有特徵設置平均值
+        for col_idx, col_name in enumerate(X_train.columns):
+            full_grid_data[col_name] = np.full(grid_points.shape[0], X_train.iloc[:, col_idx].mean())
+        
+        # 然後，覆寫選定的兩個特徵
+        full_grid_data[X_train.columns[feature_indices[0]]] = grid_points[:, 0]
+        full_grid_data[X_train.columns[feature_indices[1]]] = grid_points[:, 1]
+        
+        # 創建 DataFrame
+        full_grid_df = pd.DataFrame(full_grid_data)
+        
+        # 確保列的順序與訓練數據一致
+        full_grid_df = full_grid_df[X_train.columns]
+        
+        # 進行預測
+        Z = mlp_model.predict(full_grid_df)
+    else:
+        # 如果只有兩個特徵，直接創建 DataFrame
+        grid_df = pd.DataFrame(grid_points, columns=[X_train.columns[feature_indices[0]], 
+                                                     X_train.columns[feature_indices[1]]])
+        Z = mlp_model.predict(grid_df)
+    
+    Z = Z.reshape(xx.shape)
+    
+    # 繪製決策邊界
+    fig, ax = plt.subplots(figsize=(10, 8))
+    
+    # 使用更美觀的顏色
+    colors = ['#FFE5E5', '#E5F2FF', '#E5FFE5']  # 淡色背景
+    contour = ax.contourf(xx, yy, Z, alpha=0.6, colors=colors, levels=[-0.5, 0.5, 1.5, 2.5])
+    
+    # 繪製訓練數據點
+    scatter_colors = ['#FF6B6B', '#4DABF7', '#51CF66']  # 鮮明的點顏色
+    
+    # 這裡需要確保 target_names 在函數作用域內
+    # 假設 target_names 是全局變量，如果不是，需要作為參數傳入
+    target_names_local = ['setosa', 'versicolor', 'virginica']  # 或從參數獲取
+    
+    for i, (class_name, color) in enumerate(zip(target_names_local, scatter_colors)):
+        idx = y_train == i
+        ax.scatter(X_subset.iloc[idx, 0], X_subset.iloc[idx, 1], 
+                  c=color, label=class_name, edgecolors='black', s=100, alpha=0.8)
+    
+    ax.set_xlabel(f'{feature_names[0]}（標準化後）')
+    ax.set_ylabel(f'{feature_names[1]}（標準化後）')
+    ax.set_title('MLP 決策邊界視覺化')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    return fig
+
 # --- 模型保存路徑設定 ---
 MODEL_PATH = "mlp_model.pkl"
 SCALER_PATH = "scaler.pkl"
@@ -46,10 +259,38 @@ if os.path.exists(font_path):
 else:
     plt.rcParams['axes.unicode_minus'] = False 
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'sans-serif']
+
+# 設置全局圖表風格
+plt.style.use('seaborn-v0_8-paper')
     
+    # 更新圖表參數為研究論文風格
+plt.rcParams.update({
+        'figure.facecolor': 'white',
+        'axes.facecolor': 'white',
+        'axes.edgecolor': 'black',
+        'axes.labelcolor': 'black',
+        'axes.spines.top': True,
+        'axes.spines.right': True,
+        'axes.grid': True,
+        'grid.color': '#dddddd',
+        'grid.linestyle': '--',
+        'grid.alpha': 0.7,
+        'xtick.color': 'black',
+        'ytick.color': 'black',
+        'font.size': 11,
+        'axes.labelsize': 12,
+        'axes.titlesize': 14,
+        'lines.linewidth': 1.5,
+        
+        # 設置中文字體支援
+        'font.family': font_family_name,
+        'font.sans-serif': [font_family_name, 'DejaVu Serif', 'serif'],
+        'axes.unicode_minus': False
+    })
+
 # --- 數據加載與預處理 (使用 Streamlit 緩存) ---
 @st.cache_data
-def load_and_preprocess_data():
+def load_and_preprocess_data(test_size=0.2, use_stratify=True, random_state=42):
     iris = load_iris()
     X = pd.DataFrame(iris.data, columns=iris.feature_names)
     y = iris.target
@@ -57,19 +298,15 @@ def load_and_preprocess_data():
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     X_scaled_df = pd.DataFrame(X_scaled, columns=iris.feature_names)
-
+    
+    # 依據使用者選擇決定是否使用分層抽樣
+    stratify_param = y if use_stratify else None
+    
     X_train, X_test, y_train, y_test = train_test_split(
-        X_scaled_df, y, test_size=0.2, random_state=42, stratify=y
+        X_scaled_df, y, test_size=test_size, random_state=random_state, stratify=stratify_param
     )
+    
     return X_train, X_test, y_train, y_test, iris.target_names, X.columns.tolist(), scaler
-if 'iris_original_data_loaded' not in st.session_state:
-    iris_full_dataset = load_iris() # 從 sklearn.datasets 導入 load_iris
-    st.session_state.original_X_df = pd.DataFrame(iris_full_dataset.data, columns=iris_full_dataset.feature_names)
-    st.session_state.original_y = iris_full_dataset.target
-    # target_names 也應該在此時或透過 load_and_preprocess_data 設為 st.session_state.target_names
-    if 'target_names' not in st.session_state:
-         st.session_state.target_names = iris_full_dataset.target_names.copy() # 使用 .copy() 避免意外修改
-    st.session_state.iris_original_data_loaded = True
 
 # --- 自定義訓練函數with真實進度 ---
 def train_mlp_with_progress(mlp, X_train, y_train, progress_bar, status_text):
@@ -166,17 +403,54 @@ def comprehensive_evaluation(mlp, X_train, X_test, y_train, y_test, target_names
         'convergence_info': convergence_info
     }
 
-# 在應用程式啟動時加載和預處理數據
-X_train_full, X_test_full, y_train, y_test, target_names, all_feature_names, loaded_scaler = load_and_preprocess_data()
-
 # --- 主標題 ---
-st.title('🧠 MLP 模型訓練與預測系統')
+st.title('MLP 模型訓練與預測系統')
 st.markdown('### 透過調整參數訓練 MLP 模型，並即時進行預測')
 
 # --- 側邊欄參數設定 ---
 st.sidebar.header('🔧 MLP 模型超參數設定')
 
-# 特徵選擇
+# 資料集切分設定 - 先定義這些變數
+st.sidebar.subheader('📊 資料集切分設定')
+test_size = st.sidebar.slider('測試集比例', 0.1, 0.5, 0.2, step=0.05, 
+                         help="設定用於測試的資料比例，一般建議在 0.1~0.3 之間")
+use_stratify = st.sidebar.checkbox('啟用分層抽樣', value=True, 
+                             help="確保訓練集和測試集中各類別比例一致")
+random_state = st.sidebar.number_input('隨機種子', min_value=0, max_value=100, value=42, step=1, 
+                                  help="控制資料切分的隨機性，設定固定值可確保結果可重現")
+
+# 初始化所有 session state
+if 'iris_original_data_loaded' not in st.session_state:
+    iris_full_dataset = load_iris()
+    st.session_state.original_X_df = pd.DataFrame(iris_full_dataset.data, columns=iris_full_dataset.feature_names)
+    st.session_state.original_y = iris_full_dataset.target
+    if 'target_names' not in st.session_state:
+        st.session_state.target_names = iris_full_dataset.target_names.copy()
+    st.session_state.iris_original_data_loaded = True
+
+if 'model_trained' not in st.session_state:
+    st.session_state.model_trained = False
+if 'training_results' not in st.session_state:
+    st.session_state.training_results = None
+if 'last_selected_features' not in st.session_state:
+    st.session_state.last_selected_features = None
+if 'last_split_params' not in st.session_state:
+    st.session_state.last_split_params = (test_size, use_stratify, random_state)
+elif st.session_state.last_split_params != (test_size, use_stratify, random_state):
+    st.session_state.model_trained = False
+    st.session_state.training_results = None
+    st.sidebar.warning("⚠️ 資料集切分參數已變更，需要重新訓練模型")
+
+st.session_state.last_split_params = (test_size, use_stratify, random_state)
+
+# 現在可以安全地加載數據，因為所有需要的變數都已經定義
+X_train_full, X_test_full, y_train, y_test, target_names, all_feature_names, loaded_scaler = load_and_preprocess_data(
+    test_size=test_size,
+    use_stratify=use_stratify,
+    random_state=random_state
+)
+
+# 繼續其他側邊欄設定
 st.sidebar.subheader('📊 特徵選擇')
 selected_features = st.sidebar.multiselect(
     '選擇要包含的特徵',
@@ -184,15 +458,7 @@ selected_features = st.sidebar.multiselect(
     default=all_feature_names
 )
 
-# 初始化 session state
-if 'model_trained' not in st.session_state:
-    st.session_state.model_trained = False
-if 'training_results' not in st.session_state:
-    st.session_state.training_results = None
-if 'last_selected_features' not in st.session_state:
-    st.session_state.last_selected_features = None
-
-# 檢查特徵是否改變（如果改變則清除之前的訓練結果）
+# 檢查特徵是否改變
 if (st.session_state.last_selected_features is not None and 
     st.session_state.last_selected_features != selected_features):
     st.session_state.model_trained = False
@@ -326,14 +592,36 @@ st.sidebar.write(f"• 特徵總數: {len(all_feature_names)}")
 st.sidebar.write(f"• 選擇特徵: {len(selected_features)}")
 st.sidebar.write(f"• 類別數: {len(target_names)}")
 
+# 切分比例建議
+st.sidebar.markdown("**💡 切分比例建議：**")
+total_samples = len(X_train_full) + len(X_test_full)
+
+if total_samples < 100:
+    st.sidebar.info(f"小型資料集 ({total_samples} 樣本)，建議測試集比例: 0.2~0.3")
+elif total_samples < 1000:
+    st.sidebar.info(f"中型資料集 ({total_samples} 樣本)，建議測試集比例: 0.15~0.25")
+else:
+    st.sidebar.info(f"大型資料集 ({total_samples} 樣本)，建議測試集比例: 0.1~0.2")
+
+# 警告過小的測試集
+min_test_samples = int(total_samples * test_size)
+if min_test_samples < 30:
+    st.sidebar.warning(f"⚠️ 測試集僅有 {min_test_samples} 個樣本，可能不足以可靠評估模型")
+
 # --- 主要內容區域使用 Tabs ---
-tab1, tab2, tab3 = st.tabs(["🎯 模型訓練", "📊 訓練結果", "🔮 即時預測"])
+# 使用更美觀的標籤頁
+tabs = st.tabs([
+    "🎯 **模型訓練**", 
+    "📊 **訓練結果**", 
+    "🔮 **即時預測**"
+])
 
 # --- Tab 1: 模型訓練 ---
-with tab1:
+with tabs[0]:
     col1, col2 = st.columns([2, 1])
     
     with col1:
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
         st.subheader("🔧 當前模型設定")
         
         # 參數展示
@@ -344,7 +632,18 @@ with tab1:
             st.write(f"• 隱藏層: {hidden_layer_sizes}")
             st.write(f"• 活化函數: {activation_function}")
             st.write(f"• 優化器: {solver}")
-            
+            st.write("**📊 資料集切分資訊：**")
+            st.write(f"• 測試集比例: {test_size:.0%}")
+            st.write(f"• 分層抽樣: {'✅ 已啟用' if use_stratify else '❌ 未啟用'}")
+            st.write(f"• 隨機種子: {random_state}")
+            st.write(f"• 訓練集大小: {len(X_train)} 樣本")
+            st.write(f"• 測試集大小: {len(X_test)} 樣本")
+
+            # 顯示各類別在訓練集中的分布
+            train_class_dist = pd.Series(y_train).value_counts().sort_index()
+            train_class_dist.index = [target_names[i] for i in train_class_dist.index]
+            st.write("• 訓練集類別分布: ", dict(train_class_dist))
+
         with param_col2:
             st.write("**⚙️ 訓練參數**")
             st.write(f"• 最大迭代次數: {max_iter}")
@@ -355,8 +654,10 @@ with tab1:
         
         st.write("**📋 選擇的特徵:**")
         st.write(", ".join(selected_features))
-    
+        st.markdown('</div>', unsafe_allow_html=True)
+
     with col2:
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
         st.subheader("🚀 模型控制")
         
         train_col, reset_col = st.columns(2)
@@ -381,8 +682,10 @@ with tab1:
                         st.write(f"• 選擇特徵: {len(selected_features)} 個")
                         st.write(f"• 訓練樣本: {X_train.shape[0]} 個")
                         st.write(f"• 測試樣本: {X_test.shape[0]} 個")
+                        st.write(f"• 測試集比例: {test_size:.0%}")
+                        st.write(f"• 分層抽樣: {'已啟用' if use_stratify else '未啟用'}")
                         st.write(f"• 類別分布: {dict(zip(target_names, np.bincount(y_train)))}")
-                        
+                                                
                         # 建立模型
                         mlp = MLPClassifier(
                             hidden_layer_sizes=hidden_layer_sizes,
@@ -459,9 +762,11 @@ with tab1:
                     st.warning("⚠️ 模型文件刪除失敗，但記憶已清除")
                 
                 st.rerun()  # 重新運行應用程式
+        st.markdown('</div>', unsafe_allow_html=True)
     
     # 在所有 columns 外面顯示快速結果預覽
     if st.session_state.model_trained and st.session_state.training_results:
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
         st.subheader("📊 快速結果預覽")
         preview_col1, preview_col2, preview_col3 = st.columns(3)
         
@@ -481,17 +786,19 @@ with tab1:
         
         if abs(evaluation_results['cv_scores'].mean() - evaluation_results['test_accuracy']) > 0.2:
             st.warning("⚠️ 交叉驗證與測試結果差異較大，可能存在數據洩露或過擬合")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Tab 2: 訓練結果 ---
-with tab2:
+with tabs[1]:
     if st.session_state.model_trained and st.session_state.training_results:
         results = st.session_state.training_results
         
         # === 模型性能總覽 ===
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
         st.subheader("🎯 模型性能總覽")
         
-        # 主要指標 - 改為垂直排列避免過多列
-        col1, col2 = st.columns(2)
+        # 主要指標
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.metric(
@@ -499,6 +806,8 @@ with tab2:
                 f"{results['test_accuracy']:.3f}",
                 delta=f"{(results['test_accuracy'] - 0.33):.3f}"
             )
+            
+        with col2:
             cv_mean = results['cv_scores'].mean()
             cv_std = results['cv_scores'].std()
             st.metric(
@@ -507,7 +816,7 @@ with tab2:
                 delta=f"±{cv_std:.3f}"
             )
             
-        with col2:
+        with col3:
             overfitting = results['train_accuracy'] - results['test_accuracy']
             overfitting_status = "🟢 正常" if abs(overfitting) < 0.05 else ("🟡 輕微" if overfitting < 0.15 else "🔴 嚴重")
             st.metric(
@@ -515,7 +824,8 @@ with tab2:
                 f"{overfitting:.3f}",
                 delta=overfitting_status
             )
-            # F1 score macro average
+            
+        with col4:
             f1_macro = results['f1'].mean()
             f1_status = "🟢 優秀" if f1_macro > 0.9 else ("🟡 良好" if f1_macro > 0.7 else "🔴 需改進")
             st.metric(
@@ -523,139 +833,141 @@ with tab2:
                 f"{f1_macro:.3f}",
                 delta=f1_status
             )
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # === 性能診斷 ===
-        st.subheader("🔧 性能診斷")
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
+        st.subheader("🔧 模型健康檢查")
         
-        diagnosis_col1, diagnosis_col2 = st.columns(2)
+        # 使用三欄布局
+        diag_col1, diag_col2, diag_col3 = st.columns(3)
         
-        with diagnosis_col1:
-            st.write("**🩺 模型健康檢查**")
-            
+        with diag_col1:
             # 收斂狀態檢查
             convergence = results['convergence_info']
             if convergence['converged']:
                 st.success(f"✅ 模型已收斂 ({convergence['actual_iterations']}/{convergence['max_iterations']} 迭代)")
             else:
                 st.error(f"❌ 模型未收斂 ({convergence['actual_iterations']}/{convergence['max_iterations']} 迭代)")
-            
+        
+        with diag_col2:
             # 準確率檢查
             if results['test_accuracy'] > 0.9:
                 st.success("✅ 準確率優秀")
             elif results['test_accuracy'] > 0.7:
                 st.info("ℹ️ 準確率良好")
             else:
-                st.error("❌ 準確率偏低，需要調優")
-            
+                st.error("❌ 準確率偏低")
+        
+        with diag_col3:
             # 過擬合檢查
-            overfitting = results['train_accuracy'] - results['test_accuracy']
             if abs(overfitting) < 0.05:
                 st.success("✅ 無明顯過擬合")
             elif overfitting > 0.15:
                 st.warning("⚠️ 可能存在過擬合")
             elif overfitting < -0.05:
                 st.warning("⚠️ 異常：測試集表現優於訓練集")
-            
-            # 交叉驗證一致性檢查
-            cv_test_diff = abs(results['cv_scores'].mean() - results['test_accuracy'])
-            if cv_test_diff < 0.1:
-                st.success("✅ 交叉驗證結果一致")
-            else:
-                st.warning(f"⚠️ 交叉驗證與測試結果差異較大 ({cv_test_diff:.3f})")
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        with diagnosis_col2:
-            st.write("**💊 改進建議**")
+        # === 切分策略與交叉驗證比較 ===
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
+        st.subheader("🔄 切分策略與交叉驗證比較")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.write("**📊 切分評估結果**")
+            st.metric("訓練集準確率", f"{results['train_accuracy']:.3f}")
+            st.metric("測試集準確率", f"{results['test_accuracy']:.3f}")
+            st.write(f"測試集大小: {len(X_test)} 樣本 ({test_size:.0%})")
             
-            suggestions = []
-            
-            # 收斂問題建議
-            convergence = results['convergence_info']
-            if not convergence['converged']:
-                suggestions.append("🔄 **收斂問題：**")
-                suggestions.append("• 增加最大迭代次數 (1000-2000)")
-                suggestions.append("• 降低學習率 (0.001 → 0.0001)")
-                suggestions.append("• 啟用 Early Stopping")
-                suggestions.append("• 調整容忍度 (1e-4 → 1e-6)")
-                suggestions.append("")
-            
-            if results['test_accuracy'] < 0.7:
-                suggestions.append("🎯 **準確率提升：**")
-                suggestions.append("• 嘗試增加隱藏層神經元數量")
-                suggestions.append("• 調整學習率或優化器")
-                suggestions.append("• 增加特徵或檢查特徵品質")
-                suggestions.append("")
-            
-            overfitting = results['train_accuracy'] - results['test_accuracy']
-            if overfitting > 0.15:
-                suggestions.append("🛡️ **過擬合解決：**")
-                suggestions.append("• 增加 L2 正則化強度 (alpha)")
-                suggestions.append("• 啟用 Early Stopping")
-                suggestions.append("• 減少隱藏層大小")
-                suggestions.append("")
-            
-            if results['cv_scores'].std() > 0.1:
-                suggestions.append("📊 **穩定性改善：**")
-                suggestions.append("• 模型不夠穩定，嘗試不同的隨機種子")
-                suggestions.append("• 考慮使用更保守的參數")
-                suggestions.append("")
-            
-            if results['f1'].min() < 0.5:
-                suggestions.append("⚖️ **類別平衡：**")
-                suggestions.append("• 某些類別識別效果差")
-                suggestions.append("• 檢查數據是否不平衡")
-            
-            if not suggestions:
-                st.success("🎉 模型表現良好，無需特別調整！")
-            else:
-                for suggestion in suggestions:
-                    if suggestion.startswith("🔄") or suggestion.startswith("🎯") or suggestion.startswith("🛡️") or suggestion.startswith("📊") or suggestion.startswith("⚖️"):
-                        st.write(f"**{suggestion}**")
-                    elif suggestion == "":
-                        continue
-                    else:
-                        st.write(suggestion)
-        
+        with col2:
+            st.write("**🔄 交叉驗證結果**")
+            cv_mean = results['cv_scores'].mean()
+            cv_std = results['cv_scores'].std()
+            st.metric("平均準確率", f"{cv_mean:.3f}")
+            st.metric("標準差", f"{cv_std:.3f}")
+            st.write(f"交叉驗證折數: 5")
+
+        # 對比圖表
+        fig, ax = plt.subplots(figsize=(10, 6))
+        x = ['訓練集', '測試集', '交叉驗證']
+        y = [results['train_accuracy'], results['test_accuracy'], cv_mean]
+        colors = ['#4DABF7', '#FF6B6B', '#51CF66']
+
+        bars = ax.bar(x, y, color=colors, alpha=0.7)
+        ax.set_ylim(0, 1.1)
+        ax.set_ylabel('準確率')
+        ax.set_title('不同評估方法的準確率比較')
+        ax.grid(True, alpha=0.3, axis='y')
+
+        for bar, val in zip(bars, y):
+            ax.text(bar.get_x() + bar.get_width()/2, val + 0.02, f'{val:.3f}', 
+                    ha='center', va='bottom', fontweight='bold')
+
+        st.pyplot(fig)
+
+        # 添加下載按鈕
+        buffer = create_downloadable_plot(fig, "evaluation_comparison.png")
+        st.download_button(
+            label="📥 下載評估比較圖",
+            data=buffer,
+            file_name="evaluation_comparison.png",
+            mime="image/png"
+        )
+        plt.close(fig)
+        st.markdown('</div>', unsafe_allow_html=True)
+
         # === 詳細評估指標 ===
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
         st.subheader("📈 詳細評估指標")
         
-        eval_col1, eval_col2 = st.columns(2)
+        # 放大的交叉驗證圖
+        st.write("**🎲 交叉驗證分數分析**")
+        cv_df = pd.DataFrame({
+            'Fold': [f'Fold {i+1}' for i in range(len(results['cv_scores']))],
+            '準確率': results['cv_scores']
+        })
         
-        with eval_col1:
-            st.write("**🎲 交叉驗證分數分析**")
-            cv_df = pd.DataFrame({
-                'Fold': [f'Fold {i+1}' for i in range(len(results['cv_scores']))],
-                '準確率': results['cv_scores']
-            })
-            
-            # 交叉驗證結果圖表
-            fig_cv, ax_cv = plt.subplots(figsize=(8, 4))
-            bars = ax_cv.bar(cv_df['Fold'], cv_df['準確率'], color='skyblue', alpha=0.7)
-            ax_cv.axhline(y=cv_df['準確率'].mean(), color='red', linestyle='--', 
-                         label=f'平均值: {cv_df["準確率"].mean():.3f}')
-            ax_cv.set_ylabel('準確率')
-            ax_cv.set_title('5-Fold 交叉驗證結果')
-            ax_cv.legend()
-            ax_cv.grid(True, alpha=0.3)
-            
-            # 在柱狀圖上顯示數值
-            for bar, score in zip(bars, results['cv_scores']):
-                height = bar.get_height()
-                ax_cv.text(bar.get_x() + bar.get_width()/2., height + 0.005,
-                          f'{score:.3f}', ha='center', va='bottom')
-            
-            st.pyplot(fig_cv)
-            # 添加下載按鈕
-            buffer = create_downloadable_plot(fig_cv, "cross_validation_results.png")
-            st.download_button(
-                label="📥 下載交叉驗證圖表",
-                data=buffer,
-                file_name="cross_validation_results.png",
-                mime="image/png"
-            )
-            
-            plt.close(fig_cv)
+        # 增大圖表尺寸
+        fig_cv, ax_cv = plt.subplots(figsize=(12, 6))
+        bars = ax_cv.bar(cv_df['Fold'], cv_df['準確率'], color='skyblue', alpha=0.7, width=0.6)
+        ax_cv.axhline(y=cv_df['準確率'].mean(), color='red', linestyle='--', linewidth=2,
+                     label=f'平均值: {cv_df["準確率"].mean():.3f}')
+        ax_cv.set_ylabel('準確率', fontsize=14)
+        ax_cv.set_xlabel('交叉驗證折數', fontsize=14)
+        ax_cv.set_title('5-Fold 交叉驗證結果', fontsize=16, fontweight='bold')
+        ax_cv.legend(fontsize=12)
+        ax_cv.grid(True, alpha=0.3)
+        ax_cv.set_ylim(0, 1.1)
         
-        with eval_col2:
+        # 在柱狀圖上顯示數值
+        for bar, score in zip(bars, results['cv_scores']):
+            height = bar.get_height()
+            ax_cv.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                      f'{score:.3f}', ha='center', va='bottom', fontsize=12, fontweight='bold')
+        
+        st.pyplot(fig_cv)
+        
+        # 添加下載按鈕
+        buffer = create_downloadable_plot(fig_cv, "cross_validation_results.png")
+        st.download_button(
+            label="📥 下載交叉驗證圖表",
+            data=buffer,
+            file_name="cross_validation_results.png",
+            mime="image/png"
+        )
+        plt.close(fig_cv)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # === 各類別性能指標和信心度統計並列 ===
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
+        st.subheader("📊 性能指標詳情")
+        
+        # 使用兩列佈局
+        perf_col1, perf_col2 = st.columns(2)
+        
+        with perf_col1:
             st.write("**📊 各類別性能指標**")
             # 創建詳細的性能指標表
             performance_df = pd.DataFrame({
@@ -667,7 +979,18 @@ with tab2:
             })
             st.dataframe(performance_df, use_container_width=True)
         
-        # 性能指標雷達圖 - 移到columns外面以避免嵌套
+        with perf_col2:
+            st.write("**📊 預測信心度統計**")
+            # 信心度統計
+            max_probas = np.max(results['y_pred_proba'], axis=1)
+            confidence_stats = pd.DataFrame({
+                '指標': ['平均信心度', '最低信心度', '最高信心度', '標準差'],
+                '數值': [f"{max_probas.mean():.3f}", f"{max_probas.min():.3f}", 
+                        f"{max_probas.max():.3f}", f"{max_probas.std():.3f}"]
+            })
+            st.dataframe(confidence_stats, use_container_width=True)
+        
+        # === 性能指標雷達圖 ===
         st.write("**📊 各類別性能指標雷達圖**")
         categories = target_names
         fig_radar, ax_radar = plt.subplots(figsize=(8, 8), subplot_kw=dict(projection='polar'))
@@ -686,13 +1009,14 @@ with tab2:
             ax_radar.fill(angles, values, alpha=0.25, color=color)
         
         ax_radar.set_xticks(angles[:-1])
-        ax_radar.set_xticklabels(categories)
+        ax_radar.set_xticklabels(categories, fontsize=12)
         ax_radar.set_ylim(0, 1)
-        ax_radar.set_title('各類別性能指標雷達圖', pad=20)
+        ax_radar.set_title('各類別性能指標雷達圖', pad=20, fontsize=16)
         ax_radar.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
         ax_radar.grid(True)
         
         st.pyplot(fig_radar)
+        
         buffer = create_downloadable_plot(fig_radar, "performance_radar_chart.png")
         st.download_button(
             label="📥 下載雷達圖",
@@ -700,10 +1024,11 @@ with tab2:
             file_name="performance_radar_chart.png",
             mime="image/png"
         )
-
         plt.close(fig_radar)
-       
+        st.markdown('</div>', unsafe_allow_html=True)
+        
         # === 視覺化分析 ===
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
         st.subheader("📊 視覺化分析")
         
         visual_col1, visual_col2 = st.columns(2)
@@ -730,7 +1055,7 @@ with tab2:
             ax_cm.set_ylabel('真實標籤')
             ax_cm.set_title('混淆矩陣 (數量 & 百分比)')
             st.pyplot(fig_cm)
-            plt.close(fig_cm)
+            
             # 添加下載按鈕
             buffer = create_downloadable_plot(fig_cm, "confusion_matrix.png")
             st.download_button(
@@ -739,10 +1064,10 @@ with tab2:
                 file_name="confusion_matrix.png",
                 mime="image/png"
             )
-            
             plt.close(fig_cm)
+            
         with visual_col2:
-            st.write("**🎯 預測信心度分析**")
+            st.write("**🎯 預測信心度分布**")
             # 分析預測信心度分布
             max_probas = np.max(results['y_pred_proba'], axis=1)
             
@@ -757,6 +1082,7 @@ with tab2:
             ax_conf.grid(True, alpha=0.3)
             
             st.pyplot(fig_conf)
+            
             buffer = create_downloadable_plot(fig_conf, "confidence_distribution.png")
             st.download_button(
                 label="📥 下載信心度分布圖",
@@ -764,21 +1090,12 @@ with tab2:
                 file_name="confidence_distribution.png",
                 mime="image/png"
             )
-            
             plt.close(fig_conf)
-
-        
-        st.write("**信心度統計：**")
-        max_probas = np.max(results['y_pred_proba'], axis=1)
-        confidence_stats = pd.DataFrame({
-            '指標': ['平均信心度', '最低信心度', '最高信心度', '標準差'],
-            '數值': [f"{max_probas.mean():.3f}", f"{max_probas.min():.3f}", 
-                    f"{max_probas.max():.3f}", f"{max_probas.std():.3f}"]
-        })
-        st.dataframe(confidence_stats, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # === 學習曲線分析 ===
         if hasattr(results['mlp'], 'loss_curve_') and results['mlp'].loss_curve_:
+            st.markdown('<div class="card-container">', unsafe_allow_html=True)
             st.subheader("📉 學習曲線分析")
             
             st.write("**🔻 訓練損失曲線**")
@@ -798,6 +1115,7 @@ with tab2:
             ax_loss.legend()
             
             st.pyplot(fig_loss)
+            
             buffer = create_downloadable_plot(fig_loss, "learning_curve.png")
             st.download_button(
                 label="📥 下載學習曲線",
@@ -805,9 +1123,8 @@ with tab2:
                 file_name="learning_curve.png",
                 mime="image/png"
             )
-            
             plt.close(fig_loss)
-                        
+            
             # 學習統計
             st.write("**📊 學習統計**")
             loss_curve = results['mlp'].loss_curve_
@@ -821,50 +1138,75 @@ with tab2:
                 ]
             })
             st.dataframe(learning_stats, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # === 決策邊界視覺化 ===
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
+        st.subheader("🎨 決策邊界視覺化")
+        
+        if len(selected_features) >= 2:
+            st.write("**選擇兩個特徵來繪製決策邊界：**")
             
-            # 收斂性分析
-            st.write("**📈 收斂性分析：**")
-            recent_losses = loss_curve[-10:] if len(loss_curve) >= 10 else loss_curve
-            loss_variance = np.var(recent_losses)
+            boundary_col1, boundary_col2 = st.columns(2)
+            with boundary_col1:
+                feature_1 = st.selectbox(
+                    "選擇第一個特徵（X軸）",
+                    options=selected_features,
+                    index=0,
+                    key="boundary_feature_1"
+                )
+            with boundary_col2:
+                feature_2 = st.selectbox(
+                    "選擇第二個特徵（Y軸）",
+                    options=[f for f in selected_features if f != feature_1],
+                    index=0,
+                    key="boundary_feature_2"
+                )
             
-            if loss_variance < 1e-6:
-                st.success("✅ 模型已良好收斂")
-            elif loss_variance < 1e-4:
-                st.info("ℹ️ 模型基本收斂")
-            else:
-                st.warning("⚠️ 模型可能需要更多迭代")
-            
-            st.write(f"最後10次迭代的損失方差: {loss_variance:.2e}")
+            if st.button("🎨 繪製決策邊界", type="secondary"):
+                with st.spinner("正在繪製決策邊界..."):
+                    # 獲取特徵索引
+                    feature_indices = [selected_features.index(feature_1), 
+                                     selected_features.index(feature_2)]
+                    feature_names_selected = [feature_1, feature_2]
+                    
+                    # 繪製決策邊界
+                    fig_boundary = plot_decision_boundary(
+                        results['mlp'], 
+                        X_train, 
+                        y_train, 
+                        feature_indices,
+                        feature_names_selected,
+                        target_names,
+                        loaded_scaler
+                    )
+                    
+                    st.pyplot(fig_boundary)
+                    
+                    # 添加下載按鈕
+                    buffer = create_downloadable_plot(fig_boundary, "decision_boundary.png")
+                    st.download_button(
+                        label="📥 下載決策邊界圖",
+                        data=buffer,
+                        file_name="decision_boundary.png",
+                        mime="image/png"
+                    )
+                    plt.close(fig_boundary)
+                    
+                    # 添加說明
+                    st.info("""
+                    **圖表說明：**
+                    - 背景顏色代表模型的決策區域
+                    - 散點代表訓練數據
+                    - 不同顏色代表不同的鳶尾花種類
+                    - 邊界線顯示了模型如何區分不同類別
+                    """)
+        else:
+            st.warning("⚠️ 需要至少選擇2個特徵才能繪製決策邊界")
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        # === 快速操作 ===
-        st.subheader("⚡ 快速操作")
-        
-        if st.button("🔄 重新訓練", type="secondary", use_container_width=False):
-            st.info("💡 請切換到「🎯 模型訓練」標籤頁調整參數並重新訓練")
-        
-        if st.button("🔮 前往預測", type="secondary", use_container_width=False):
-            st.info("💡 請切換到「🔮 即時預測」標籤頁進行預測")
-        
-        if st.button("📥 下載報告", type="secondary", use_container_width=False):
-            # 創建簡單的報告摘要
-            report_data = {
-                "測試準確率": results['test_accuracy'],
-                "交叉驗證均值": results['cv_scores'].mean(),
-                "交叉驗證標準差": results['cv_scores'].std(),
-                "F1-Score": results['f1'].mean(),
-                "過擬合程度": results['train_accuracy'] - results['test_accuracy']
-            }
-            
-            report_df = pd.DataFrame(list(report_data.items()), columns=['指標', '數值'])
-            csv = report_df.to_csv(index=False)
-            st.download_button(
-                label="下載 CSV 報告",
-                data=csv,
-                file_name="mlp_training_report.csv",
-                mime="text/csv"
-            )
-        
-        # === 模型複雜度分析 ===
+        # === 模型詳細資訊 ===
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
         st.subheader("🔍 模型詳細資訊")
         
         model_info_col1, model_info_col2 = st.columns(2)
@@ -896,156 +1238,355 @@ with tab2:
                 ]
             })
             st.dataframe(training_info, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # === 快速操作 ===
+        st.markdown('<div class="card-container">', unsafe_allow_html=True)
+        st.subheader("⚡ 快速操作")
+        
+        op_col1, op_col2, op_col3 = st.columns(3)
+        
+        with op_col1:
+            if st.button("🔄 重新訓練", type="secondary", use_container_width=True):
+                st.info("💡 請切換到「🎯 模型訓練」標籤頁")
+        
+        with op_col2:
+            if st.button("🔮 前往預測", type="secondary", use_container_width=True):
+                st.info("💡 請切換到「🔮 即時預測」標籤頁")
+        
+        with op_col3:
+            # 創建簡單的報告摘要
+            report_data = {
+                "測試準確率": results['test_accuracy'],
+                "交叉驗證均值": results['cv_scores'].mean(),
+                "交叉驗證標準差": results['cv_scores'].std(),
+                "F1-Score": results['f1'].mean(),
+                "過擬合程度": results['train_accuracy'] - results['test_accuracy']
+            }
+            
+            report_df = pd.DataFrame(list(report_data.items()), columns=['指標', '數值'])
+            csv = report_df.to_csv(index=False)
+            st.download_button(
+                label="📥 下載報告",
+                data=csv,
+                file_name="mlp_training_report.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
     
     elif model_exists:
         st.info("📁 發現已保存的模型，但本次未進行訓練。如需查看詳細結果，請重新訓練模型。")
     else:
         st.warning("⚠️ 請先在「🎯 模型訓練」標籤頁訓練模型")
+
 # --- Tab 3: 即時預測 ---
-with tab3:
+with tabs[2]:
     # 檢查模型是否可用
     if model_exists:
         try:
             loaded_mlp_model = joblib.load(MODEL_PATH)
             loaded_data_scaler = joblib.load(SCALER_PATH)
-            original_X_df = st.session_state.original_X_df
-            original_y = st.session_state.original_y
-            # 確保 target_names 是從 session_state 或全域變數正確獲取
+            
             st.success("✅ 模型載入成功，可以進行預測！")
-            st.subheader("🔮 輸入特徵值進行預測 或 從原始樣本載入")
-            st.markdown("---")
-            # 特徵輸入區
-            st.write("**從原始鳶尾花資料集載入樣本進行預測：**")
-            sample_id_to_load = st.selectbox(
-                f"選擇一個原始樣本 ID (0 到 {len(original_X_df) - 1}):",
-                options=list(range(len(original_X_df))),
-                index=0, # 預設載入第一個樣本
-                key="sample_id_selector_tab3"
-            )
-
-            loaded_sample_features = original_X_df.iloc[sample_id_to_load] # DataFrame Series
-            true_label_for_loaded_sample_index = original_y[sample_id_to_load] # int
-            true_label_name_for_loaded_sample = target_names[true_label_for_loaded_sample_index] # str
-
-            st.info(f"目前載入的樣本 ID: {sample_id_to_load}。其已知的正確種類是: **{true_label_name_for_loaded_sample}**")
-            st.caption("下方的特徵值已從所選樣本自動填入，您可以直接預測，或修改後再預測。")
-            # --- 【新增結束】---
-
-            # 創建輸入表單
-            with st.form("prediction_form_tab3_v2"): # 更新 form 的 key 以示區別
-                st.write("**請輸入或確認特徵值：**")
-                input_data = {}
-                for i, feature in enumerate(selected_features): # selected_features 來自側邊欄
-                    # 特徵輸入框的預設值使用載入樣本的特徵值
-                    default_value_for_input = loaded_sample_features.get(feature, 0.0) # 使用 .get 以防 feature 名稱意外不匹配
-
-                    # help 文字中的參考範圍，使用訓練集的統計數據 (原始尺度)
-                    # 假設 X_train_full (已縮放的訓練集特徵) 和 loaded_data_scaler (在 X_train_orig 上擬合) 可用
-                    feature_idx_for_stats = all_feature_names.index(feature) # all_feature_names 應包含所有原始特徵名
-                    # 以下計算假設 loaded_data_scaler 的 mean_ 和 scale_ 來自 X_train_orig
-                    # 並且 X_train_full[feature] 是已縮放的該特徵的訓練數據 Series
-                    original_scale_train_feature_stats = X_train_full[feature].values * loaded_data_scaler.scale_[feature_idx_for_stats] + loaded_data_scaler.mean_[feature_idx_for_stats]
-                    min_val_for_help = original_scale_train_feature_stats.min()
-                    max_val_for_help = original_scale_train_feature_stats.max()
-
-                    input_data[feature] = st.number_input(
-                        f'📏 {feature}',
-                        value=float(default_value_for_input), # 預設填入載入樣本的特徵值
-                        min_value=float(min_val_for_help - 1 if min_val_for_help is not np.nan else 0.0), # 處理可能的nan
-                        max_value=float(max_val_for_help + 1 if max_val_for_help is not np.nan else 10.0), # 處理可能的nan
-                        step=0.1,
-                        help=f"參考範圍 (來自訓練集分布): {min_val_for_help:.2f} ~ {max_val_for_help:.2f}"
-                    )
-
-                predict_button = st.form_submit_button("🔮 對上方特徵值進行預測", type="primary", use_container_width=True)
-
-            if predict_button:
-                try:
-                    # --- 準備預測的輸入資料 (與您現有邏輯類似) ---
-                    full_input_df = pd.DataFrame(columns=all_feature_names)
-                    for feature_iter_name in all_feature_names:
-                        if feature_iter_name in selected_features: # 只使用側邊欄選擇的特徵進行預測
-                            full_input_df.loc[0, feature_iter_name] = input_data[feature_iter_name]
-                        else:
-                            # 對於模型訓練時包含但本次預測未在 selected_features 中的特徵，
-                            # 仍需用原始訓練集的平均值填充以符合 scaler 的期望
-                            feature_idx = all_feature_names.index(feature_iter_name)
-                            original_mean = loaded_data_scaler.mean_[feature_idx] # 來自 X_train_orig 的平均值
-                            full_input_df.loc[0, feature_iter_name] = original_mean
+            
+            # 預測界面
+            st.markdown('<div class="card-container">', unsafe_allow_html=True)
+            st.subheader("🔮 輸入特徵值進行預測")
+            
+            # 使用原始資料作為參考
+            if 'original_X_df' in st.session_state and 'original_y' in st.session_state:
+                original_X_df = st.session_state.original_X_df
+                original_y = st.session_state.original_y
+                
+                st.write("**從原始鳶尾花資料集載入樣本作為起點：**")
+                sample_id_to_load = st.selectbox(
+                    f"選擇一個原始樣本 ID (0 到 {len(original_X_df) - 1}):",
+                    options=list(range(len(original_X_df))),
+                    index=0,
+                    key="sample_id_selector_tab3"
+                )
+                
+                initially_loaded_sample_features = original_X_df.iloc[sample_id_to_load]
+                initially_loaded_true_label_index = original_y[sample_id_to_load]
+                initially_loaded_true_label_name = target_names[initially_loaded_true_label_index]
+                
+                st.info(f"📌 當前選擇樣本 ID: {sample_id_to_load}，其真實類別為: **{initially_loaded_true_label_name}**")
+                st.caption("💡 下方的特徵值已從所選樣本自動填入，您可以自由調整它們。")
+                
+                # 創建輸入表單
+                with st.form("prediction_form"):
+                    st.write("**請輸入或調整特徵值：**")
                     
-                    input_scaled = loaded_data_scaler.transform(full_input_df) # 縮放所有特徵
-                    # 根據側邊欄選擇的特徵來選取實際用於模型預測的列
-                    selected_indices_for_model = [all_feature_names.index(f) for f in selected_features]
-                    input_for_prediction = input_scaled[:, selected_indices_for_model]
-                    # --- 預測資料準備結束 ---
-
-                    prediction_proba = loaded_mlp_model.predict_proba(input_for_prediction)
-                    prediction_class_index = np.argmax(prediction_proba)
-                    predicted_label_name = target_names[prediction_class_index]
-
-                    # --- 顯示標準預測結果 (與您現有邏輯類似) ---
-                    st.subheader("🎉 預測結果")
-                    st.metric(
-                        "🌸 模型預測類別",
-                        predicted_label_name,
-                        delta=f"信心度: {prediction_proba[0][prediction_class_index]:.1%}"
-                    )
-                    # ... (您原本顯示預測機率長條圖和詳細機率分布的程式碼照舊) ...
-                    # (機率長條圖)
-                    proba_df_display = pd.DataFrame({ # 避免變數名衝突
-                        '種類': target_names, # 使用正確的 target_names
-                        '機率': prediction_proba[0]
-                    }).sort_values('機率', ascending=True)
-                    fig_pred_display, ax_pred_display = plt.subplots(figsize=(8, 4)) # 避免變數名衝突
-                    bars_display = ax_pred_display.barh(proba_df_display['種類'], proba_df_display['機率'],
-                                          color=['#ff7f7f' if name == predicted_label_name else '#87ceeb'
-                                                 for name in proba_df_display['種類']])
-                    ax_pred_display.set_xlabel('預測機率')
-                    ax_pred_display.set_title('各類別預測機率分布')
-                    ax_pred_display.set_xlim(0, 1)
-                    for bar_item_display in bars_display: # 避免變數名衝突
-                        width_display = bar_item_display.get_width()
-                        ax_pred_display.text(width_display + 0.01, bar_item_display.get_y() + bar_item_display.get_height()/2,
-                                   f'{width_display:.1%}', ha='left', va='center', fontweight='bold')
-                    plt.tight_layout()
-                    st.pyplot(fig_pred_display)
-                    plt.close(fig_pred_display)
-
-                    # (詳細機率表)
-                    st.subheader("🔬 詳細機率分布")
-                    detailed_proba_df_display = pd.DataFrame({
-                        '花的種類': target_names, # 使用正確的 target_names
-                        '預測機率': [f"{p:.1%}" for p in prediction_proba[0]],
-                        '信心等級': ['🔥 高信心' if p > 0.7 else '⚡ 中信心' if p > 0.4 else '💤 低信心'
-                                   for p in prediction_proba[0]]
-                    })
-                    st.dataframe(detailed_proba_df_display, use_container_width=True)
-                    # --- 標準預測結果顯示結束 ---
-
-                    # --- 【修改】比對模型預測與 "自動載入的" 原始樣本正確答案 ---
-                    st.subheader("🔍 預測與原始樣本答案比對")
-                    if predicted_label_name == true_label_name_for_loaded_sample: # true_label_name_for_loaded_sample 來自選擇的樣本
-                        st.success(f"✅ **一致！** 模型預測 ({predicted_label_name}) 與所選原始樣本 (ID: {sample_id_to_load}) 的正確答案 ({true_label_name_for_loaded_sample}) 相同。")
-                    else:
-                        st.error(f"❌ **不一致！** 模型預測為 ({predicted_label_name})，但所選原始樣本 (ID: {sample_id_to_load}) 的正確答案是 ({true_label_name_for_loaded_sample})。")
-                    # --- 【修改結束】---
-
-                except Exception as e:
-                    st.error(f"❌ 預測過程發生錯誤：{e}")
-                    import traceback
-                    st.text("詳細錯誤堆疊：")
-                    st.code(traceback.format_exc())
-        # ... (處理模型載入失敗和模型未訓練的 except 和 else 區塊照舊) ...
+                    input_data = {}
+                    cols = st.columns(2)  # 創建兩列以改善布局
+                    
+                    for i, feature in enumerate(all_feature_names):
+                        col_idx = i % 2
+                        with cols[col_idx]:
+                            # 獲取預設值並限制為1位小數
+                            default_value = round(float(initially_loaded_sample_features.get(feature, 0.0)), 1)
+                            
+                            # 計算合理的範圍
+                            feature_values = original_X_df[feature]
+                            min_val = float(feature_values.min())
+                            max_val = float(feature_values.max())
+                            mean_val = float(feature_values.mean())
+                            
+                            input_data[feature] = st.number_input(
+                                f'📏 {feature}',
+                                value=default_value,
+                                min_value=round(min_val - 1.0, 1),
+                                max_value=round(max_val + 1.0, 1),
+                                step=0.1,
+                                format="%.1f",  # 限制顯示格式為1位小數
+                                help=f"原始資料範圍: {min_val:.1f} ~ {max_val:.1f}，平均值: {mean_val:.1f}",
+                                key=f"input_{feature}_tab3"
+                            )
+                    
+                    predict_button = st.form_submit_button("🔮 開始預測", type="primary", use_container_width=True)
+                
+                if predict_button:
+                    try:
+                        # 準備輸入數據
+                        final_input_features_dict = input_data.copy()
+                        final_input_features_array = np.array([final_input_features_dict[f] for f in all_feature_names])
+                        
+                        # 查找是否匹配原始資料中的樣本
+                        label_for_comparison = initially_loaded_true_label_name
+                        source_of_label_info = f"樣本 ID {sample_id_to_load}"
+                        found_match = False
+                        matched_sample_id = sample_id_to_load
+                        
+                        # 使用寬鬆的容差進行比對
+                        for idx, original_row_values in enumerate(original_X_df.values):
+                            # 將原始資料和輸入都四捨五入到1位小數進行比較
+                            rounded_original = np.round(original_row_values, 1)
+                            rounded_input = np.round(final_input_features_array, 1)
+                            
+                            if np.allclose(rounded_input, rounded_original, atol=1e-2, rtol=0):
+                                matched_label = target_names[original_y[idx]]
+                                label_for_comparison = matched_label
+                                matched_sample_id = idx
+                                source_of_label_info = f"樣本 ID {idx}"
+                                
+                                if idx != sample_id_to_load:
+                                    st.success(f"🔍 發現匹配！您輸入的特徵值與樣本 ID {idx} ({matched_label}) 完全一致。")
+                                    found_match = True
+                                    break
+                        
+                        if not found_match and matched_sample_id != sample_id_to_load:
+                            st.info("💡 當前輸入為自定義特徵組合。")
+                        
+                        # 處理只使用選定特徵的情況
+                        full_input_df = pd.DataFrame([final_input_features_dict])[all_feature_names]
+                        input_scaled = loaded_data_scaler.transform(full_input_df)
+                        
+                        # 只選擇模型訓練時使用的特徵
+                        selected_indices = [all_feature_names.index(f) for f in selected_features]
+                        input_for_prediction = input_scaled[:, selected_indices]
+                        
+                        # 模型預測
+                        prediction_proba = loaded_mlp_model.predict_proba(input_for_prediction)
+                        prediction_class = np.argmax(prediction_proba)
+                        predicted_label = target_names[prediction_class]
+                        confidence = prediction_proba[0][prediction_class]
+                        
+                        # === 顯示預測結果 ===
+                        st.markdown("---")
+                        st.subheader("🎉 預測結果")
+                        
+                        # 主要結果展示
+                        result_col1, result_col2, result_col3 = st.columns([2, 2, 1])
+                        
+                        with result_col1:
+                            st.metric(
+                                "🌸 預測類別",
+                                predicted_label,
+                                delta=f"信心度: {confidence:.1%}"
+                            )
+                        
+                        with result_col2:
+                            st.metric(
+                                "📊 參考答案",
+                                label_for_comparison,
+                                delta=source_of_label_info
+                            )
+                        
+                        with result_col3:
+                            if predicted_label == label_for_comparison:
+                                st.success("✅ 正確")
+                            else:
+                                st.error("❌ 錯誤")
+                        
+                        # 機率分布視覺化
+                        st.markdown("---")
+                        st.subheader("📊 預測機率分布")
+                        
+                        # 創建機率DataFrame
+                        proba_df = pd.DataFrame({
+                            '種類': target_names,
+                            '機率': prediction_proba[0]
+                        }).sort_values('機率', ascending=True)
+                        
+                        # 繪製橫條圖
+                        fig_pred, ax_pred = plt.subplots(figsize=(10, 6))
+                        
+                        # 使用不同顏色標記預測類別
+                        colors = ['#ff7f7f' if name == predicted_label else '#87ceeb' 
+                                 for name in proba_df['種類']]
+                        
+                        bars = ax_pred.barh(proba_df['種類'], proba_df['機率'], color=colors, alpha=0.8)
+                        
+                        # 設置圖表屬性
+                        ax_pred.set_xlabel('預測機率', fontsize=12)
+                        ax_pred.set_title('各類別預測機率分布', fontsize=14, fontweight='bold')
+                        ax_pred.set_xlim(0, 1)
+                        ax_pred.grid(True, alpha=0.3, axis='x')
+                        
+                        # 在橫條上顯示數值
+                        for i, (bar, prob) in enumerate(zip(bars, proba_df['機率'])):
+                            width = bar.get_width()
+                            if width > 0.1:  # 只在機率大於10%時在條內顯示
+                                ax_pred.text(width/2, bar.get_y() + bar.get_height()/2, 
+                                           f'{width:.1%}', ha='center', va='center', 
+                                           fontweight='bold', color='white')
+                            else:  # 否則在條外顯示
+                                ax_pred.text(width + 0.01, bar.get_y() + bar.get_height()/2, 
+                                           f'{width:.1%}', ha='left', va='center', 
+                                           fontweight='bold')
+                        
+                        # 添加預測標記
+                        for i, name in enumerate(proba_df['種類']):
+                            if name == predicted_label:
+                                ax_pred.text(1.02, i, '← 預測', va='center', fontweight='bold', color='red')
+                        
+                        plt.tight_layout()
+                        st.pyplot(fig_pred)
+                        
+                        # 添加下載按鈕
+                        buffer = create_downloadable_plot(fig_pred, "prediction_probability.png")
+                        st.download_button(
+                            label="📥 下載預測機率圖",
+                            data=buffer,
+                            file_name="prediction_probability.png",
+                            mime="image/png",
+                            key="download_pred_prob"
+                        )
+                        plt.close(fig_pred)
+                        
+                        # 詳細機率表格
+                        st.subheader("📋 詳細預測資訊")
+                        
+                        # 創建詳細資訊表
+                        detailed_proba = pd.DataFrame({
+                            '花的種類': target_names,
+                            '預測機率': [f"{p:.2%}" for p in prediction_proba[0]],
+                            '信心等級': ['🔥 高' if p > 0.7 else '⚡ 中' if p > 0.4 else '💤 低' 
+                                        for p in prediction_proba[0]],
+                            '排名': [f"第 {i+1} 名" for i in range(len(target_names))]
+                        })
+                        
+                        # 按機率排序
+                        detailed_proba = detailed_proba.sort_values('預測機率', ascending=False)
+                        detailed_proba.index = range(1, len(detailed_proba) + 1)
+                        
+                        st.dataframe(detailed_proba, use_container_width=True)
+                        
+                        # 特徵貢獻分析（如果只選了部分特徵）
+                        if len(selected_features) < len(all_feature_names):
+                            st.info(f"💡 **注意**：模型預測僅基於 {len(selected_features)} 個選定特徵: {', '.join(selected_features)}")
+                        
+                        # 預測解釋
+                        st.subheader("🔍 預測解釋")
+                        
+                        if confidence > 0.9:
+                            st.success(f"模型對預測結果 **{predicted_label}** 非常有信心（{confidence:.1%}）！")
+                        elif confidence > 0.7:
+                            st.info(f"模型較有信心預測為 **{predicted_label}**（{confidence:.1%}）。")
+                        else:
+                            st.warning(f"模型預測為 **{predicted_label}**，但信心度較低（{confidence:.1%}），建議謹慎參考。")
+                        
+                        # 輸入特徵摘要
+                        with st.expander("📝 查看輸入特徵摘要"):
+                            input_summary = pd.DataFrame({
+                                '特徵名稱': all_feature_names,
+                                '輸入值': [f"{input_data[f]:.1f}" for f in all_feature_names],
+                                '是否用於預測': ['✅ 是' if f in selected_features else '❌ 否' for f in all_feature_names]
+                            })
+                            st.dataframe(input_summary, use_container_width=True)
+                        
+                    except Exception as e:
+                        st.error(f"❌ 預測過程發生錯誤：{e}")
+                        import traceback
+                        st.text("詳細錯誤信息：")
+                        st.code(traceback.format_exc())
+                
+                # 快速測試按鈕
+                st.markdown("---")
+                st.subheader("⚡ 快速測試")
+                
+                quick_test_col1, quick_test_col2, quick_test_col3 = st.columns(3)
+                
+                with quick_test_col1:
+                    if st.button("🌺 測試 Setosa 樣本", use_container_width=True):
+                        st.info("請選擇樣本 ID 0-49 中的任一個")
+                
+                with quick_test_col2:
+                    if st.button("🌸 測試 Versicolor 樣本", use_container_width=True):
+                        st.info("請選擇樣本 ID 50-99 中的任一個")
+                
+                with quick_test_col3:
+                    if st.button("🌼 測試 Virginica 樣本", use_container_width=True):
+                        st.info("請選擇樣本 ID 100-149 中的任一個")
+                
+            else:
+                # 如果沒有原始資料，提供手動輸入
+                st.warning("⚠️ 無法載入原始資料集，請手動輸入特徵值。")
+                
+                with st.form("manual_prediction_form"):
+                    st.write("**請輸入特徵值：**")
+                    
+                    input_data = {}
+                    for feature in selected_features:
+                        input_data[feature] = st.number_input(
+                            f'📏 {feature}',
+                            value=0.0,
+                            step=0.1,
+                            format="%.1f",
+                            key=f"manual_input_{feature}"
+                        )
+                    
+                    predict_button = st.form_submit_button("🔮 開始預測", type="primary", use_container_width=True)
+                
+                if predict_button:
+                    st.info("請確保您的輸入值已經過適當的標準化處理。")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
         except Exception as e:
             st.error(f"❌ 模型載入失敗：{e}")
-            import traceback
-            st.text("詳細錯誤堆疊：")
-            st.code(traceback.format_exc())
-    else: # model_exists is False
+            st.text("請確保模型檔案存在且未損壞。")
+    
+    else:
         st.warning("⚠️ 請先在「🎯 模型訓練」標籤頁訓練模型")
         st.info("💡 訓練完成後即可在此進行即時預測")
+        
+        # 提供範例說明
+        with st.expander("📖 使用說明"):
+            st.markdown("""
+            **如何使用即時預測功能：**
             
+            1. **訓練模型**：先在「模型訓練」頁面完成模型訓練
+            2. **選擇樣本**：從下拉選單選擇一個原始樣本作為起點
+            3. **調整特徵**：根據需要調整各個特徵值
+            4. **進行預測**：點擊預測按鈕查看結果
+            5. **分析結果**：查看預測類別、信心度和機率分布
             
+            **提示**：
+            - 特徵值會自動限制為1位小數，確保輸入精度一致
+            - 系統會自動檢測您的輸入是否匹配原始資料集中的樣本
+            - 可以下載預測結果圖表用於報告或分享
+            """)
 
 # --- 頁腳 ---
 st.markdown("---")
