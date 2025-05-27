@@ -16,7 +16,7 @@ from io import BytesIO
 import zipfile
 import pytz
 from datetime import datetime
-
+import io
 # --- 頁面配置 ---
 st.set_page_config(
     page_title="MLP 模型訓練器",
@@ -30,6 +30,14 @@ taiwan_tz = pytz.timezone('Asia/Taipei')
 current_time = datetime.now(taiwan_tz)
 date_str = current_time.strftime("%Y年%m月%d日")
 time_str = current_time.strftime("%H:%M:%S")
+
+def get_csv_download_bytes(df):
+    """創建帶有BOM標記的CSV，解決中文亂碼問題"""
+    buffer = io.BytesIO()
+    buffer.write(b'\xef\xbb\xbf')  # UTF-8 BOM
+    buffer.write(df.to_csv(index=False).encode('utf-8'))
+    buffer.seek(0)
+    return buffer
 
 # --- 自定義 CSS 樣式 ---
 st.markdown("""
@@ -1072,7 +1080,13 @@ with tabs[1]:
                 '樣本數': results['support'].astype(int)
             })
             st.dataframe(performance_df, use_container_width=True)
-        
+            csv = performance_df.to_csv(index=False)
+            st.download_button(
+                label="📥 下載性能指標表",
+                data=get_csv_download_bytes(performance_df),
+                file_name="performance_metrics.csv",
+                mime="text/csv",
+            )
         with perf_col2:
             st.write("**📊 預測信心度統計**")
             # 信心度統計
@@ -1083,7 +1097,14 @@ with tabs[1]:
                         f"{max_probas.max():.3f}", f"{max_probas.std():.3f}"]
             })
             st.dataframe(confidence_stats, use_container_width=True)
-        
+            csv = confidence_stats.to_csv(index=False)
+            
+            st.download_button(
+                label="📥 下載信心度統計表",
+                data=get_csv_download_bytes(confidence_stats),
+                file_name="confidence_stats.csv",
+                mime="text/csv",
+            )
         # === 性能指標雷達圖 ===
         st.write("**📊 各類別性能指標雷達圖**")
         categories = target_names
@@ -1232,6 +1253,13 @@ with tabs[1]:
                 ]
             })
             st.dataframe(learning_stats, use_container_width=True)
+            csv = learning_stats.to_csv(index=False)
+            st.download_button(
+                label="📥 下載學習統計表",
+                data=get_csv_download_bytes(confidence_stats),
+                file_name="learning_stats.csv",
+                mime="text/csv",
+            )
             st.markdown('</div>', unsafe_allow_html=True)
         
         # === 決策邊界視覺化 ===
@@ -1307,31 +1335,24 @@ with tabs[1]:
         
         with model_info_col1:
             st.write("**🏗️ 模型架構**")
-            architecture_info = pd.DataFrame({
-                '層級': ['輸入層'] + [f'隱藏層{i+1}' for i in range(len(results['mlp'].coefs_)-1)] + ['輸出層'],
-                '神經元數': [results['mlp'].coefs_[0].shape[0]] + 
-                          [coef.shape[1] for coef in results['mlp'].coefs_[:-1]] + 
-                          [results['mlp'].coefs_[-1].shape[1]]
-            })
-            st.dataframe(architecture_info, use_container_width=True)
-        
+            
         with model_info_col2:
             st.write("**📊 訓練資訊**")
-            convergence = results['convergence_info']
-            # 將所有數值轉換為字串以避免混合類型錯誤
-            training_info = pd.DataFrame({
-                '指標': ['實際迭代次數', '最大迭代次數', '收斂狀態', '權重參數總數', '偏置參數總數', '總參數量'],
-                '數值': [
-                    str(convergence['actual_iterations']),
-                    str(convergence['max_iterations']),
-                    "✅ 已收斂" if convergence['converged'] else "❌ 未收斂",
-                    str(sum(coef.size for coef in results['mlp'].coefs_)),
-                    str(sum(intercept.size for intercept in results['mlp'].intercepts_)),
-                    str(sum(coef.size for coef in results['mlp'].coefs_) + 
-                        sum(intercept.size for intercept in results['mlp'].intercepts_))
-                ]
-            })
-            st.dataframe(training_info, use_container_width=True)
+            architecture_info = pd.DataFrame({
+        '層級': ['輸入層'] + [f'隱藏層{i+1}' for i in range(len(results['mlp'].coefs_)-1)] + ['輸出層'],
+        '神經元數': [str(results['mlp'].coefs_[0].shape[0])] + 
+                [str(coef.shape[1]) for coef in results['mlp'].coefs_[:-1]] + 
+                [str(results['mlp'].coefs_[-1].shape[1])]
+        })
+        st.dataframe(architecture_info, use_container_width=True)
+        
+        # 確保使用正確的列名下載
+        st.download_button(
+            label="📥 下載模型架構表",
+            data=get_csv_download_bytes(architecture_info),  # 使用正確的DataFrame
+            file_name="model_architecture.csv",
+            mime="text/csv",
+        )
         st.markdown('</div>', unsafe_allow_html=True)
         
         # === 快速操作 ===
@@ -1359,10 +1380,9 @@ with tabs[1]:
             }
             
             report_df = pd.DataFrame(list(report_data.items()), columns=['指標', '數值'])
-            csv = report_df.to_csv(index=False)
             st.download_button(
                 label="📥 下載報告",
-                data=csv,
+                data=get_csv_download_bytes(report_df),
                 file_name="mlp_training_report.csv",
                 mime="text/csv",
                 use_container_width=True
@@ -1608,8 +1628,14 @@ with tabs[2]:
                         detailed_proba.index = range(1, len(detailed_proba) + 1)
                         
                         st.dataframe(detailed_proba, use_container_width=True)
-                        
-                        # 特徵貢獻分析（如果只選了部分特徵）
+                        csv = detailed_proba.to_csv()
+                        st.download_button(
+                            label="📥 下載預測結果表",
+                            data=get_csv_download_bytes(confidence_stats),
+                            file_name="prediction_results.csv",
+                            mime="text/csv",
+                        )
+                       # 特徵貢獻分析（如果只選了部分特徵）
                         if len(selected_features) < len(all_feature_names):
                             st.info(f"💡 **注意**：模型預測僅基於 {len(selected_features)} 個選定特徵: {', '.join(selected_features)}")
                         
